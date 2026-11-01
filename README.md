@@ -1,7 +1,7 @@
 # Myduino Jetson Orin Nano Super Lab (JetPack 6.2)
 
 Hands-on lab code for the Myduino Jetson Orin Nano Super Training Bundle. No Linux background needed.
-The lab manuals (Word files) are in Google Classroom.
+The lab manuals (PDF files) are in Google Classroom.
 
 ## Start Here (on the Jetson)
 
@@ -15,6 +15,16 @@ bash run_jupyter.sh  # notebooks for the labs
 ```
 
 No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
+
+After setup, open a **new terminal**. A helper called `lab` types the lab commands for you:
+
+```bash
+lab          # list of the labs and their parts
+lab 2        # the parts of Lab 2
+lab 2 A      # run Part A of Lab 2
+```
+
+The manuals still show every command, so you can also type them yourself.
 
 ## Course Flow
 
@@ -34,12 +44,13 @@ No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home f
 ## Folders
 
 - `labs/`: example code for each lab (reference copies). Labs 5, 6 and 7 include a notebook.
+- `lab.sh` and `labs/lib.sh`: the `lab` helper. Each lab folder has a script such as `labs/lab2_linux1/lab2.sh`.
 - `setup.sh`, `run_demo.sh`, `run_jupyter.sh`, `verify_setup.py`: setup and launchers.
 
 ## Starting Again
 
-If you break something, delete this folder and clone it again.
+If you break something, delete this folder and clone it again. Your own work is in `~/jetson-labs`.
 
 ## Status
 
-The code was checked on a development machine (CPU only), not yet on a Jetson.
+Labs 5 to 9 were tested on a Jetson Orin Nano Super (JetPack 6.2). The `lab` helper scripts are new and are still being tested on the board.
