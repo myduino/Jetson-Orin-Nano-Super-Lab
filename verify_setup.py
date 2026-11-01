@@ -5,7 +5,7 @@ def show(name, value):
     print(f"{name:<22}{value}")
 
 show("Python", platform.python_version())
-for mod in ["numpy", "scipy", "cv2", "cupy", "torch", "torchvision", "ultralytics", "tensorrt"]:
+for mod in ["numpy", "scipy", "cv2", "cupy", "torch", "torchvision", "ultralytics", "tensorrt", "onnx"]:
     try:
         m = importlib.import_module(mod)
         show(mod, getattr(m, "__version__", "ok"))

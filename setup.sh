@@ -65,7 +65,8 @@ pip install -U ultralytics
 pip uninstall -y opencv-python opencv-python-headless 2>/dev/null
 echo "Note: pip may now print a red ERROR about opencv-python. This is expected and harmless. The course uses the OpenCV that comes with JetPack."
 # The SciPy that comes with Ubuntu is too old for NumPy 1.26 and prints a warning
-pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15"
+# onnx and onnxslim are needed by the TensorRT export in Lab 8 (Ultralytics would install them during the lab otherwise)
+pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15" "onnx>=1.12.0,<2.0.0" "onnxslim>=0.1.82"
 
 echo "== 5b. AI model files (Lab 7) =="
 # Downloaded once here, so the labs need no internet. Safe to run again (files that exist are not downloaded again).
