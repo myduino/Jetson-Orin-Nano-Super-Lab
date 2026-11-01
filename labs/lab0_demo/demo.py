@@ -93,6 +93,12 @@ def draw(img, game, fps, now, conf):
                   for i in range(0, min(len(game.found), 12), 3)]
         lines += [("R = try again   Q = quit", yellow)]
         panel(img, lines, 10, 10, min(w - 20, 620))
+    if game.state != "ready":
+        # the title is already in the start panel, so show it small at the bottom
+        cv2.putText(img, "MYDUINO AI VISION DEMO", (12, h - 12),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+        cv2.putText(img, "MYDUINO AI VISION DEMO", (12, h - 12),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, yellow, 2)
     cv2.putText(img, f"{fps:.0f} FPS", (w - 110, h - 12),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
