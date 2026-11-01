@@ -44,7 +44,8 @@ echo "== 5. Ultralytics =="
 # -U because an older Ultralytics may already be on the board and YOLO26 needs a recent one
 pip install -U ultralytics
 pip uninstall -y opencv-python opencv-python-headless 2>/dev/null
-pip install "numpy<2" "cupy-cuda12x<14"
+# The SciPy that comes with Ubuntu is too old for NumPy 1.26 and prints a warning
+pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15"
 
 echo "== 6. Lab workspace =="
 mkdir -p ~/jetson-labs
