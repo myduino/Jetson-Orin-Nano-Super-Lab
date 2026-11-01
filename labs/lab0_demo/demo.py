@@ -8,7 +8,7 @@ from ultralytics import YOLO
 # ---------------- Settings ----------------
 MODEL = "yolo26n_fp16.engine"   # fast model. Falls back to yolo26n.pt
 CHALLENGE_SECONDS = 60          # length of the game
-CONFIDENCE = 0.40               # how sure the model must be
+CONFIDENCE = 0.40               # how sure the model must be (+ and - change it)
 SCALE = 1.5                     # make the window bigger
 # ------------------------------------------
 
@@ -50,9 +50,9 @@ class Game:
             self.state = "done"
 
 
-def see(frame):
+def see(frame, conf):
     """Run the model. Return the picture with boxes and the set of names."""
-    result = model(frame, conf=CONFIDENCE, device=device, verbose=False)[0]
+    result = model(frame, conf=conf, device=device, verbose=False)[0]
     names = {result.names[int(c)] for c in result.boxes.cls}
     return result.plot(), names
 
@@ -68,7 +68,7 @@ def panel(img, lines, x, y, width):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, colour, 2)
 
 
-def draw(img, game, fps, now):
+def draw(img, game, fps, now, conf):
     """Add the game text on top of the picture."""
     white, green, yellow = (255, 255, 255), (0, 255, 0), (0, 255, 255)
     h, w = img.shape[:2]
@@ -76,10 +76,12 @@ def draw(img, game, fps, now):
         panel(img, [("AI VISION DEMO", yellow),
                     ("Show objects to the camera", white),
                     ("SPACE = start the 60 second challenge", green),
+                    (f"+ / - = change the confidence ({conf:.2f})", white),
                     ("Q = quit", white)], 10, 10, 520)
     elif game.state == "playing":
         panel(img, [(f"Time left: {game.time_left(now):4.0f} s", yellow),
-                    (f"Kinds found: {len(game.found)}", green)], 10, 10, 300)
+                    (f"Kinds found: {len(game.found)}", green),
+                    (f"Confidence: {conf:.2f}  (+ / -)", white)], 10, 10, 360)
         shown = game.found[-10:]
         lines = [(name, white) for name in shown]
         if lines:
@@ -104,8 +106,9 @@ def main():
         raise SystemExit("Cannot open the camera. Check the USB cable.")
 
     game = Game(CHALLENGE_SECONDS)
+    conf = CONFIDENCE
     fps, last = 0.0, time.perf_counter()
-    print("SPACE = start, R = restart, Q = quit")
+    print("SPACE = start, R = restart, + / - = confidence, Q = quit")
 
     while True:
         ok, frame = cap.read()
@@ -113,19 +116,23 @@ def main():
             print("No frame from the camera.")
             break
 
-        shown, names = see(frame)
+        shown, names = see(frame, conf)
         now = time.perf_counter()
         game.update(names, now)
         fps = 0.9 * fps + 0.1 * (1.0 / (now - last))
         last = now
 
         shown = cv2.resize(shown, None, fx=SCALE, fy=SCALE)
-        draw(shown, game, fps, now)
+        draw(shown, game, fps, now, conf)
         cv2.imshow("Jetson AI Vision Demo", shown)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
             break
+        if key in (ord("+"), ord("=")):
+            conf = min(0.95, conf + 0.05)
+        if key in (ord("-"), ord("_")):
+            conf = max(0.05, conf - 0.05)
         if key == ord(" ") and game.state == "ready":
             game.start(now)
         if key == ord("r"):
