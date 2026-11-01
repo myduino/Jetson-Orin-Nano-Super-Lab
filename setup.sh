@@ -19,6 +19,10 @@ grep -q "alias jet=" ~/.bashrc || echo "alias jet='source ~/venvs/jetson/bin/act
 source ~/venvs/jetson/bin/activate
 pip install --upgrade pip
 pip install "numpy<2" jupyterlab
+# OpenCV on the Jetson changes how the CPU handles tiny numbers, so NumPy prints a harmless
+# "smallest subnormal" warning. Hide only that one message in this environment.
+SITE="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+echo 'import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")' > "$SITE/myduino_quiet.pth"
 
 echo "== 3. CuPy (Lab 5) =="
 # CuPy 14 needs NumPy 2, but the Jetson libraries need NumPy 1, so use CuPy 13
@@ -48,6 +52,7 @@ echo "== 5. Ultralytics =="
 # -U because an older Ultralytics may already be on the board and YOLO26 needs a recent one
 pip install -U ultralytics
 pip uninstall -y opencv-python opencv-python-headless 2>/dev/null
+echo "Note: pip may now print a red ERROR about opencv-python. This is expected and harmless. The course uses the OpenCV that comes with JetPack."
 # The SciPy that comes with Ubuntu is too old for NumPy 1.26 and prints a warning
 pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15"
 
