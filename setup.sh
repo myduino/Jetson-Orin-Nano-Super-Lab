@@ -16,6 +16,9 @@ echo "== 2. Python environment =="
 mkdir -p ~/venvs
 [ -d ~/venvs/jetson ] || python3 -m venv --system-site-packages ~/venvs/jetson
 grep -q "alias jet=" ~/.bashrc || echo "alias jet='source ~/venvs/jetson/bin/activate'" >> ~/.bashrc
+# "lab 2 C" runs the commands of Lab 2, Part C for you (see lab.sh). Open a new terminal after setup.
+sed -i '/^alias lab=/d' ~/.bashrc
+echo "alias lab='bash \"$HERE/lab.sh\"'" >> ~/.bashrc
 source ~/venvs/jetson/bin/activate
 pip install --upgrade pip
 pip install "numpy<2" jupyterlab
