@@ -56,6 +56,13 @@ echo "Note: pip may now print a red ERROR about opencv-python. This is expected 
 # The SciPy that comes with Ubuntu is too old for NumPy 1.26 and prints a warning
 pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15"
 
+echo "== 5b. AI model files (Lab 7) =="
+# Downloaded once here, so the labs need no internet. Safe to run again (files that exist are not downloaded again).
+mkdir -p ~/jetson-labs/models
+( cd ~/jetson-labs/models && python -c "from ultralytics import YOLO; [YOLO(n) for n in ('yolo26n-cls.pt', 'yolo26n.pt', 'yolo26s.pt')]" ) \
+  || echo "The model files did not download. Check the internet and run this script again, or tell your instructor."
+echo "Model files in ~/jetson-labs/models: $(ls ~/jetson-labs/models/*.pt 2>/dev/null | wc -l) of 3"
+
 echo "== 6. Lab workspace =="
 mkdir -p ~/jetson-labs
 for n in 1 2 3 4 5 6 7 8 9; do mkdir -p ~/jetson-labs/lab$n; done
