@@ -8,7 +8,7 @@ PARTS=(
   "B|Build the FP32 and FP16 engines (takes about 12 minutes)"
   "C|Benchmark: compare speed of the model and the engines"
   "D|Live FPS with TensorRT (a window opens on the Jetson screen)"
-  "E|Speed and power modes (switches 15W, 25W and MAXN SUPER, about 3 minutes)"
+  "E|Speed and power modes (switches 15W, 25W and MAXN SUPER, about 2 minutes)"
 )
 
 LABDIR="$(dirname "$SCRIPT")"
@@ -78,7 +78,7 @@ partD() {
 partE() {
   prepare
   title "Part E: Speed and power modes"
-  say "For each mode the script switches, waits 30 seconds and runs the benchmark."
+  say "For each mode the script switches, waits 10 seconds and runs the benchmark."
   say "Open jtop in a second terminal tab and note the GPU temperature after each run."
   say "sudo may ask for your password."
   pause
@@ -89,7 +89,7 @@ partE() {
     title "Power mode $name (mode $m)"
     run sudo nvpmodel -m $m
     run sudo nvpmodel -q
-    countdown 30 "Letting the clocks settle:"
+    countdown 10 "Letting the clocks settle:"
     run "python benchmark_trt.py 2>&1 | grep -E 'FPS'"
     pause
   done
