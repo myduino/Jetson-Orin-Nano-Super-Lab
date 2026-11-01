@@ -79,26 +79,22 @@ def draw(img, game, fps, now, conf):
                     (f"+ / - = change the confidence ({conf:.2f})", white),
                     ("Q = quit", white)], 10, 10, 520)
     elif game.state == "playing":
-        panel(img, [(f"Time left: {game.time_left(now):4.0f} s", yellow),
+        panel(img, [("MYDUINO AI VISION DEMO", yellow),
+                    (f"Time left: {game.time_left(now):4.0f} s", white),
                     (f"Kinds found: {len(game.found)}", green),
-                    (f"Confidence: {conf:.2f}  (+ / -)", white)], 10, 10, 360)
+                    (f"Confidence: {conf:.2f}  (+ / -)", white)], 10, 10, 380)
         shown = game.found[-10:]
         lines = [(name, white) for name in shown]
         if lines:
             panel(img, lines, w - 250, 10, 240)
     else:
-        lines = [("TIME IS UP!", yellow),
+        lines = [("MYDUINO AI VISION DEMO", yellow),
+                 ("TIME IS UP!", white),
                  (f"You found {len(game.found)} kinds:", green)]
         lines += [(", ".join(game.found[i:i + 3]), white)
                   for i in range(0, min(len(game.found), 12), 3)]
         lines += [("R = try again   Q = quit", yellow)]
         panel(img, lines, 10, 10, min(w - 20, 620))
-    if game.state != "ready":
-        # the title is already in the start panel, so show it small at the bottom
-        cv2.putText(img, "MYDUINO AI VISION DEMO", (12, h - 12),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-        cv2.putText(img, "MYDUINO AI VISION DEMO", (12, h - 12),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, yellow, 2)
     cv2.putText(img, f"{fps:.0f} FPS", (w - 110, h - 12),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
