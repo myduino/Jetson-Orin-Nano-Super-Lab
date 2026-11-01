@@ -73,7 +73,7 @@ def draw(img, game, fps, now, conf):
     white, green, yellow = (255, 255, 255), (0, 255, 0), (0, 255, 255)
     h, w = img.shape[:2]
     if game.state == "ready":
-        panel(img, [("AI VISION DEMO", yellow),
+        panel(img, [("MYDUINO AI VISION DEMO", yellow),
                     ("Show objects to the camera", white),
                     ("SPACE = start the 60 second challenge", green),
                     (f"+ / - = change the confidence ({conf:.2f})", white),
@@ -124,7 +124,7 @@ def main():
 
         shown = cv2.resize(shown, None, fx=SCALE, fy=SCALE)
         draw(shown, game, fps, now, conf)
-        cv2.imshow("Jetson AI Vision Demo", shown)
+        cv2.imshow("Myduino AI Vision Demo", shown)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
