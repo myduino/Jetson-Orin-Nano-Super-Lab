@@ -89,7 +89,7 @@ partE() {
     title "Power mode $name (mode $m)"
     run sudo nvpmodel -m $m
     run sudo nvpmodel -q
-    run sleep 30
+    countdown 30 "Letting the clocks settle:"
     run "python benchmark_trt.py 2>&1 | grep -E 'FPS'"
     pause
   done

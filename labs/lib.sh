@@ -30,3 +30,14 @@ show_parts() {
   done
   echo
 }
+
+# countdown N "message": waits N seconds and shows the time left on one line
+countdown() {
+  local n=$1 msg=$2
+  while [ "$n" -gt 0 ]; do
+    printf "\r  %s %2d s " "$msg" "$n"
+    sleep 1
+    n=$((n-1))
+  done
+  printf "\r  %s done.      \n" "$msg"
+}
