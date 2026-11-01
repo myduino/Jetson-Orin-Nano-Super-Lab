@@ -26,14 +26,14 @@ No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home f
 | 3 | Ubuntu Linux Essentials (Part 2) | Terminal |
 | 4 | Python on Jetson | Terminal, then Jupyter |
 | 5 | NVIDIA CUDA with Python | Terminal and Jupyter |
-| 6 | Image Processing with OpenCV | Terminal |
-| 7 | AI Vision and Inference | Terminal |
-| 8 | Optimisation with TensorRT | Terminal |
+| 6 | Image Processing with OpenCV | Terminal and Jupyter |
+| 7 | AI Vision and Inference | Terminal and Jupyter |
+| 8 | Optimisation with TensorRT | Terminal only |
 | 9 | Mini Project | Terminal |
 
 ## Folders
 
-- `labs/`: example code for each lab (reference copies). Lab 5 includes a notebook.
+- `labs/`: example code for each lab (reference copies). Labs 5, 6 and 7 include a notebook.
 - `setup.sh`, `run_demo.sh`, `run_jupyter.sh`, `verify_setup.py`: setup and launchers.
 
 ## Starting Again
