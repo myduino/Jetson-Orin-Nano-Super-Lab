@@ -30,7 +30,7 @@ while True:
             cv2.putText(frame, f"centre ({x + w // 2}, {y + h // 2})", (x, y - 8),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    cv2.imshow("Colour Tracker", frame)
+    cv2.imshow("Myduino Colour Tracker", frame)
     cv2.imshow("Mask", mask)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break

@@ -79,7 +79,7 @@ def main():
                 print(f"ALERT: {count} {TARGET} at {stamp}")
                 last_alert = now
 
-        cv2.imshow("Mini Project", shown)
+        cv2.imshow("Myduino Mini Project", shown)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 

@@ -34,7 +34,7 @@ while True:
     cv2.putText(shown, f"{mode}  {fps:.0f} FPS", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, 255 if mode == "edges" else (0, 255, 0), 2)
 
-    cv2.imshow("Jetson Live", shown)
+    cv2.imshow("Myduino Live", shown)
     key = cv2.waitKey(1) & 0xFF
     if key == ord("q"):
         break
