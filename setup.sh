@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run ONCE after cloning this folder:   bash setup.sh
-# Needs internet. Safe to run again.  NOT TESTED ON A JETSON YET.
+# Needs internet. Safe to run again.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "== Myduino Jetson Orin Nano Super Lab: setup =="
@@ -17,7 +17,8 @@ pip install --upgrade pip
 pip install "numpy<2" jupyterlab
 
 echo "== 3. CuPy (Lab 5) =="
-pip install cupy-cuda12x || echo "CuPy did not install. Tell your instructor."
+# CuPy 14 needs NumPy 2, but the Jetson libraries need NumPy 1, so use CuPy 13
+pip install "cupy-cuda12x<14" "numpy<2" || echo "CuPy did not install. Tell your instructor."
 
 echo "== 4. PyTorch with GPU =="
 # True only if PyTorch imports AND a real calculation runs on the GPU
@@ -40,9 +41,10 @@ else
 fi
 
 echo "== 5. Ultralytics =="
-pip install ultralytics
+# -U because an older Ultralytics may already be on the board and YOLO26 needs a recent one
+pip install -U ultralytics
 pip uninstall -y opencv-python opencv-python-headless 2>/dev/null
-pip install "numpy<2"
+pip install "numpy<2" "cupy-cuda12x<14"
 
 echo "== 6. Lab workspace =="
 mkdir -p ~/jetson-labs
