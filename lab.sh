@@ -27,12 +27,17 @@ find_script() { ls "$HERE"/labs/lab"$1"_*/lab"$1".sh 2>/dev/null | head -n 1; }
 if [ -z "$LAB" ]; then
   printf '\n%sMyduino Jetson Orin Nano Super Lab%s\n' "$CT" "$CN"
   echo "Type  lab <number> <part>  to run a part, for example:  lab 2 C"
-  echo "Type  lab <number>  to see the parts of one lab."
   echo
   for t in "${TITLES[@]}"; do
     n="${t%%|*}"; name="${t#*|}"
-    if [ -n "$(find_script "$n")" ]; then mark="ready"; else mark="not ready yet"; fi
-    printf '  Lab %s  %-42s %s\n' "$n" "$name" "$mark"
+    script="$(find_script "$n")"
+    if [ -z "$script" ]; then
+      printf '%sLab %s  %s%s   (not ready yet)\n\n' "$CT" "$n" "$name" "$CN"
+      continue
+    fi
+    printf '%sLab %s  %s%s\n' "$CT" "$n" "$name" "$CN"
+    ( source "$script"; for p in "${PARTS[@]}"; do printf '    lab %s %s   %s\n' "$n" "${p%%|*}" "${p#*|}"; done )
+    echo
   done
   echo
   exit 0
