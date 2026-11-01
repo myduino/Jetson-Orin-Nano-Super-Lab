@@ -31,8 +31,19 @@ pip install "cupy-cuda12x<14" "numpy<2" || echo "CuPy did not install. Tell your
 echo "== 4. PyTorch with GPU =="
 # True only if PyTorch imports AND a real calculation runs on the GPU
 gpu_ok() { python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() and float((torch.ones(64,64,device='cuda')@torch.ones(64,64,device='cuda')).sum())==262144.0 else 1)" 2>/dev/null; }
+# True if PyTorch imports and reports a GPU (even if the test calculation failed)
+sees_gpu() { python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; }
 if gpu_ok; then
   echo "PyTorch with GPU support is already installed."
+elif sees_gpu; then
+  # PyTorch is fine but the test calculation failed, for example because the GPU memory is full.
+  # Do NOT replace a PyTorch that already sees the GPU.
+  echo
+  echo "PyTorch sees the GPU, but a test calculation on it failed."
+  echo "Close JupyterLab, the browser and other programs, then run  bash setup.sh  again."
+  echo "The error was:"
+  python -c "import torch; print((torch.ones(64,64,device='cuda')@torch.ones(64,64,device='cuda')).sum())" 2>&1 | tail -n 3
+  exit 1
 else
   echo "Installing the Jetson build of PyTorch (JetPack 6.2, CUDA 12.6). This is a large download."
   pip install torch torchvision --index-url https://pypi.jetson-ai-lab.io/jp6/cu126 --force-reinstall
