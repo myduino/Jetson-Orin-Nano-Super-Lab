@@ -1,4 +1,4 @@
-# Jetson Orin Nano Super Lab (JetPack 6.2)
+# Myduino Jetson Orin Nano Super Lab (JetPack 6.2)
 
 Hands-on lab code for the Myduino Jetson Orin Nano Super Training Bundle. No Linux background needed.
 The lab manuals (Word files) are in Google Classroom.

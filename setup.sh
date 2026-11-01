@@ -3,6 +3,7 @@
 # Needs internet. Safe to run again.  NOT TESTED ON A JETSON YET.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+echo "== Myduino Jetson Orin Nano Super Lab: setup =="
 echo "== 1. System packages =="
 sudo apt update
 sudo apt install -y python3-venv python3-pip python3-opencv v4l-utils nano tree htop git
