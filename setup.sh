@@ -8,6 +8,10 @@ echo "== 1. System packages =="
 sudo apt update
 sudo apt install -y python3-venv python3-pip python3-opencv v4l-utils nano tree htop git
 
+echo "== 1b. jtop monitor (Lab 1) =="
+# jetson-stats goes into the system Python, so it must run before the venv is activated
+command -v jtop >/dev/null 2>&1 || sudo -H pip3 install -U jetson-stats || echo "jtop did not install. Tell your instructor."
+
 echo "== 2. Python environment =="
 mkdir -p ~/venvs
 [ -d ~/venvs/jetson ] || python3 -m venv --system-site-packages ~/venvs/jetson
