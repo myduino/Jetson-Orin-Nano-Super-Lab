@@ -2,6 +2,16 @@
 # Lab 2: Ubuntu Linux Essentials, Part 1.   Run a part with:   lab 2 A   (or B, C, D, E, F)
 # This file is loaded by lab.sh. It shows each command and then runs it for you.
 
+LAB_TITLE="Ubuntu Linux Essentials, Part 1"
+PARTS=(
+  "A|Open the terminal and run your first commands"
+  "B|Navigate the file system (ls and cd)"
+  "C|Create and manage files and folders"
+  "D|Read files (echo, cat, head and less)"
+  "E|Edit a file with nano"
+  "F|Get help and work faster (man, --help, history)"
+)
+
 partA() {
   title "Part A, Step 2: Run your first commands"
   run whoami
@@ -124,6 +134,6 @@ main() {
     D) partD ;;
     E) partE ;;
     F) partF ;;
-    *) parts_help C "A B C D E F" ;;
+    *) show_parts ;;
   esac
 }

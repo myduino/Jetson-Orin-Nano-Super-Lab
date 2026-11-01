@@ -1,24 +1,54 @@
 #!/bin/bash
-# Runs the commands of one lab part for you.   Usage:   lab <lab number> <part letter>
-# Example:   lab 2 C      (the "lab" shortcut is created by setup.sh; open a new terminal after setup)
+# Runs the commands of one lab part for you.
+#   lab            shows the list of labs
+#   lab 2          shows the parts of Lab 2
+#   lab 2 C        runs Part C of Lab 2
+# (The "lab" shortcut is made by setup.sh. Open a new terminal after setup.)
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB="$1"
 PART="$(echo "$2" | tr a-z A-Z)"
+source "$HERE/labs/lib.sh"
+
+TITLES=(
+  "0|See It First"
+  "1|Introduction to Jetson Orin Nano Super"
+  "2|Ubuntu Linux Essentials, Part 1"
+  "3|Ubuntu Linux Essentials, Part 2"
+  "4|Python on Jetson"
+  "5|NVIDIA CUDA with Python"
+  "6|Image Processing with OpenCV"
+  "7|AI Vision and Inference"
+  "8|Optimisation with TensorRT"
+  "9|Mini Project"
+)
+
+find_script() { ls "$HERE"/labs/lab"$1"_*/lab"$1".sh 2>/dev/null | head -n 1; }
 
 if [ -z "$LAB" ]; then
-  echo "Usage: lab <lab number> <part letter>      for example: lab 2 C"
-  echo "Labs with a script: $(ls "$HERE"/labs/lab*_*/lab[0-9].sh 2>/dev/null | sed 's/.*\/lab\([0-9]\)\.sh/\1/' | tr '\n' ' ')"
+  printf '\n%sMyduino Jetson Orin Nano Super Lab%s\n' "$CT" "$CN"
+  echo "Type  lab <number> <part>  to run a part, for example:  lab 2 C"
+  echo "Type  lab <number>  to see the parts of one lab."
+  echo
+  for t in "${TITLES[@]}"; do
+    n="${t%%|*}"; name="${t#*|}"
+    if [ -n "$(find_script "$n")" ]; then mark="ready"; else mark="not ready yet"; fi
+    printf '  Lab %s  %-42s %s\n' "$n" "$name" "$mark"
+  done
+  echo
   exit 0
 fi
 
-SCRIPT=$(ls "$HERE"/labs/lab"$LAB"_*/lab"$LAB".sh 2>/dev/null | head -n 1)
+SCRIPT="$(find_script "$LAB")"
 if [ -z "$SCRIPT" ]; then
-  echo "There is no script for lab $LAB. Check the number in your manual."
+  echo "Lab $LAB has no script. Type the commands from your manual, or type  lab  to see the list."
   exit 1
 fi
 
 source ~/venvs/jetson/bin/activate 2>/dev/null
-source "$HERE/labs/lib.sh"
 LABNUM="$LAB"
 source "$SCRIPT"
+if [ -z "$PART" ]; then
+  show_parts
+  exit 0
+fi
 main "$PART"

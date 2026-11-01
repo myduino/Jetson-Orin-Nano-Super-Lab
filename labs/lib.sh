@@ -20,8 +20,13 @@ pause() {
   if [ -t 0 ]; then read -r -p $'\nPress Enter to go on... ' _; fi
 }
 
-# parts_help: list the parts of a lab when no part letter is given.
-parts_help() {
-  echo "Usage: lab $LABNUM <part>      for example: lab $LABNUM $1"
-  echo "Parts: $2"
+# show_parts: list the parts of the lab that is loaded (each lab script sets LAB_TITLE and PARTS).
+show_parts() {
+  printf '\n%sLab %s: %s%s\n' "$CT" "$LABNUM" "$LAB_TITLE" "$CN"
+  echo "Type  lab $LABNUM <part>  to run a part, for example:  lab $LABNUM ${PARTS[0]%%|*}"
+  echo
+  for p in "${PARTS[@]}"; do
+    printf '  lab %s %s   %s\n' "$LABNUM" "${p%%|*}" "${p#*|}"
+  done
+  echo
 }
