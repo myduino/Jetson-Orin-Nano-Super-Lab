@@ -72,6 +72,9 @@ echo "== 5b. AI model files (Lab 7) =="
 mkdir -p ~/jetson-labs/models
 ( cd ~/jetson-labs/models && python -c "from ultralytics import YOLO; [YOLO(n) for n in ('yolo26n-cls.pt', 'yolo26n.pt', 'yolo26s.pt')]" ) \
   || echo "The model files did not download. Check the internet and run this script again, or tell your instructor."
+# The two sample pictures that come with Ultralytics (bus.jpg and zidane.jpg), kept beside the models
+( cd ~/jetson-labs/models && python -c "import glob, os, shutil, ultralytics; a = os.path.join(os.path.dirname(ultralytics.__file__), 'assets'); [shutil.copy(f, '.') for f in glob.glob(a + '/*.jpg')]" ) \
+  || echo "The sample pictures were not copied. Tell your instructor."
 echo "Model files in ~/jetson-labs/models: $(ls ~/jetson-labs/models/*.pt 2>/dev/null | wc -l) of 3"
 
 echo "== 6. Lab workspace =="
