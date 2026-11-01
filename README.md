@@ -7,14 +7,14 @@ The lab manuals (Word files) are in Google Classroom.
 
 ```bash
 cd ~
-git clone https://github.com/ariffinzulkifli/jetson-orin-nano-super-lab.git
-cd jetson-orin-nano-super-lab
+git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
+cd Jetson-Orin-Nano-Super-Lab
 bash setup.sh        # once, needs internet, takes a while
 bash run_demo.sh     # Lab 0 AI vision demo
 bash run_jupyter.sh  # notebooks for the labs
 ```
 
-No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `jetson-orin-nano-super-lab`.
+No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
 
 ## Course Flow
 
