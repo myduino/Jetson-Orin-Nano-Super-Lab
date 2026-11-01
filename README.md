@@ -53,4 +53,4 @@ If you break something, delete this folder and clone it again. Your own work is 
 
 ## Status
 
-Labs 5 to 9 were tested on a Jetson Orin Nano Super (JetPack 6.2). The `lab` helper scripts are new and are still being tested on the board.
+Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9.
