@@ -1,7 +1,13 @@
 #!/bin/bash
 # Runs the commands of one lab part for you.
-#   lab start      opens JupyterLab with the lab notebooks (lab start 5 opens Lab 5)
+#   lab start      asks your name, then opens JupyterLab with your lab notebooks (lab start 5 opens Lab 5)
+#   lab me         shows who you are and where your folder is
 #   lab reset 5    gives you a fresh copy of the Lab 5 notebook
+# Teacher:
+#   lab share ali siti    JupyterLab for each student's laptop (lab share, lab share stop)
+#   lab clean siti        delete the folder of a student     lab clean   lists the students
+#   lab check             reset the board for the next session
+#   lab share-engine      share the TensorRT engines built in Lab 8
 #   lab            shows the list of labs
 #   lab 2          shows the parts of Lab 2
 #   lab 2 C        runs Part C of Lab 2
@@ -27,8 +33,13 @@ TITLES=(
 find_script() { ls "$HERE"/labs/lab"$1"_*/lab"$1".sh 2>/dev/null | head -n 1; }
 
 case "$LAB" in
-  start) lab_start "$2"; exit $? ;;
-  reset) lab_reset "$2"; exit $? ;;
+  start)        lab_start "${@:2}"; exit $? ;;
+  me)           ensure_student && echo "You are $(basename "$LAB_HOME"). Your folder: $LAB_HOME"; exit $? ;;
+  reset)        ensure_student && lab_reset "$2"; exit $? ;;
+  share)        lab_share "${@:2}"; exit $? ;;
+  clean)        lab_clean "$2"; exit $? ;;
+  check)        lab_check "$2"; exit $? ;;
+  share-engine) ensure_student && lab_share_engine "$2"; exit $? ;;
 esac
 
 if [ -z "$LAB" ]; then
@@ -57,6 +68,8 @@ if [ -z "$SCRIPT" ]; then
   exit 1
 fi
 
+ensure_student || exit 1
+export EXTRA="$3"
 source ~/venvs/jetson/bin/activate 2>/dev/null
 LABNUM="$LAB"
 source "$SCRIPT"

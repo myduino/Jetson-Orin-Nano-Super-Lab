@@ -14,7 +14,7 @@ PARTS=(
 
 partA() {
   title "Part A, Step 1: Create the workspace"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab5
   run cd lab5
   pause

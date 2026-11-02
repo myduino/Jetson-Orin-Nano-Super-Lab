@@ -12,12 +12,12 @@ PARTS=(
 )
 
 LABDIR="$(dirname "$SCRIPT")"
-WORK=~/jetson-labs/lab4
+WORK="$LAB_HOME"/lab4
 
 partA() {
   deactivate 2>/dev/null     # Part A shows the system Python, so the course environment is off here
   title "Part A, Step 1: Create the workspace and check Python"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab4
   run cd lab4
   run python3 --version

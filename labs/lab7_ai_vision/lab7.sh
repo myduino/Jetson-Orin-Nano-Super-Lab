@@ -12,11 +12,11 @@ PARTS=(
 )
 
 LABDIR="$(dirname "$SCRIPT")"
-WORK=~/jetson-labs/lab7
+WORK="$LAB_HOME"/lab7
 
 partA() {
   title "Part A, Step 1: Create the workspace"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab7
   run cd lab7
   pause
@@ -33,7 +33,7 @@ partNB() {
 partD() {
   mkdir -p "$WORK"
   [ -f "$WORK/live_detect.py" ] || cp "$LABDIR/live_detect.py" "$WORK/live_detect.py"
-  [ -f "$WORK/yolo26n.pt" ] || cp ~/jetson-labs/models/yolo26n.pt "$WORK/" 2>/dev/null
+  [ -f "$WORK/yolo26n.pt" ] || cp "$LAB_HOME"/models/yolo26n.pt "$WORK/" 2>/dev/null
   title "Part D, Step 1: Run live detection"
   say "A window opens on the Jetson screen. Press q in the window to quit. Run this on the Jetson desktop, not over SSH."
   say "Close the notebook tab and stop JupyterLab first (Ctrl + C in its terminal) to free memory."

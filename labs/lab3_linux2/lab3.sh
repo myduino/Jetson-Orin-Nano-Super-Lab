@@ -12,16 +12,16 @@ PARTS=(
 
 partA() {
   title "Part A, Step 1: Create the Lab 3 workspace"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab3
   run cd lab3
   run mkdir -p scripts files
   run ls -l
   pause
   title "Part A, Step 2: Read permission strings"
-  mkdir -p ~/jetson-labs/lab2/notes
-  [ -f ~/jetson-labs/lab2/notes/board_info.txt ] || say "(board_info.txt from Lab 2 Part E is missing, so the first command will show an error.)"
-  run ls -l ~/jetson-labs/lab2/notes/board_info.txt
+  mkdir -p "$LAB_HOME"/lab2/notes
+  [ -f "$LAB_HOME"/lab2/notes/board_info.txt ] || say "(board_info.txt from Lab 2 Part E is missing, so the first command will show an error.)"
+  run ls -l "$LAB_HOME"/lab2/notes/board_info.txt
   run ls -l /etc/hostname
   run ls -l /etc/shadow
   run ls -l /bin/ls
@@ -29,7 +29,7 @@ partA() {
   run cat /etc/shadow
   pause
   title "Part A, Step 3: Make a script executable"
-  run cd ~/jetson-labs/lab3
+  run cd "$LAB_HOME"/lab3
   run "printf '#!/bin/bash\necho \"Hello from the Jetson\"\necho \"Today is \$(date)\"\necho \"I am \$(whoami)\"\n' > scripts/hello.sh"
   run chmod -x scripts/hello.sh
   run cat scripts/hello.sh
@@ -107,8 +107,8 @@ partC() {
   printf '    ssh %s@%s\n' "$(whoami)" "$IP"
   say "To copy files with scp, type these on the laptop:"
   printf '    echo "Hello from my laptop" > laptop_note.txt\n'
-  printf '    scp laptop_note.txt %s@%s:~/jetson-labs/lab3/files/\n' "$(whoami)" "$IP"
-  printf '    scp %s@%s:~/jetson-labs/lab2/notes/board_info.txt .\n' "$(whoami)" "$IP"
+  printf '    scp laptop_note.txt %s@%s:%s/lab3/files/\n' "$(whoami)" "$IP" "$LAB_HOME"
+  printf '    scp %s@%s:%s/lab2/notes/board_info.txt .\n' "$(whoami)" "$IP" "$LAB_HOME"
   pause
 }
 
@@ -117,7 +117,7 @@ partD() {
   run uptime
   run free -h
   run df -h /
-  run du -sh ~/jetson-labs
+  run du -sh "$LAB_HOME"
   pause
   title "Part D, Step 2: Watch the system live"
   say "top opens next. Press q to quit. Then htop opens. Press q or F10 to quit."

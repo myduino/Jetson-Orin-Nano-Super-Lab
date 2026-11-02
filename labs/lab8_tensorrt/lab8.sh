@@ -1,5 +1,6 @@
 #!/bin/bash
 # Lab 8: Optimisation with TensorRT.   Run a part with:   lab 8 A   (or B, C, D, E)
+# Part B copies the engines your teacher shared (lab share-engine). To build your own:   lab 8 B build
 # Everything in this lab runs in the terminal. Close JupyterLab first to free memory.
 
 LAB_TITLE="Optimisation with TensorRT"
@@ -12,7 +13,7 @@ PARTS=(
 )
 
 LABDIR="$(dirname "$SCRIPT")"
-WORK=~/jetson-labs/lab8
+WORK="$LAB_HOME"/lab8
 
 prepare() {
   mkdir -p "$WORK"
@@ -20,13 +21,13 @@ prepare() {
     [ -f "$WORK/$f" ] || cp "$LABDIR/$f" "$WORK/$f"
   done
   for f in yolo26n.pt bus.jpg; do
-    [ -f "$WORK/$f" ] || cp ~/jetson-labs/models/$f "$WORK/" 2>/dev/null
+    [ -f "$WORK/$f" ] || cp "$LAB_HOME"/models/$f "$WORK/" 2>/dev/null
   done
 }
 
 partA() {
   title "Part A, Step 1: Create the workspace"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab8
   prepare
   run cd lab8
@@ -43,6 +44,16 @@ partA() {
 
 partB() {
   prepare
+  if [ "$EXTRA" != "build" ] && [ -f "$SHARED/engines/yolo26n_fp32.engine" ] && [ -f "$SHARED/engines/yolo26n_fp16.engine" ]; then
+    title "Part B: The engines are already built"
+    say "Your teacher built them once for this Jetson. Copying takes seconds."
+    say "To build your own (about 12 minutes), type:  lab 8 B build"
+    run cd "$WORK"
+    run cp "$SHARED/engines/yolo26n_fp32.engine" "$SHARED/engines/yolo26n_fp16.engine" .
+    run "ls -lh *.engine"
+    pause
+    return
+  fi
   title "Part B, Step 1: Export the FP32 and FP16 engines"
   say "This takes about 4 minutes for FP32 and about 8 minutes for FP16. Do not close the terminal."
   say "Red or yellow lines starting with [TRT] are normal."

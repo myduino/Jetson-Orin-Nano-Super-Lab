@@ -55,9 +55,7 @@ partC() {
   run tree --version
   pause
   title "Part C, Step 2: Build your lab workspace"
-  run cd ~
-  run mkdir -p jetson-labs
-  run cd jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab2
   run cd lab2
   run mkdir -p notes scripts data
@@ -83,15 +81,15 @@ partC() {
   run ls
   pause
   title "Part C, Step 6: View the result as a tree"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run tree lab2
   pause
 }
 
 partD() {
-  mkdir -p ~/jetson-labs/lab2/notes
+  mkdir -p "$LAB_HOME"/lab2/notes
   title "Part D, Step 1: Write and read a small file"
-  run cd ~/jetson-labs/lab2
+  run cd "$LAB_HOME"/lab2
   run 'echo "Hello Jetson" > notes/hello.txt'
   run 'echo "Linux is fun" >> notes/hello.txt'
   run cat notes/hello.txt
@@ -105,9 +103,9 @@ partD() {
 }
 
 partE() {
-  mkdir -p ~/jetson-labs/lab2/notes
+  mkdir -p "$LAB_HOME"/lab2/notes
   title "Part E, Step 1: Create the file and open it in nano"
-  run cd ~/jetson-labs/lab2/notes
+  run cd "$LAB_HOME"/lab2/notes
   run "printf 'Board: Jetson Orin Nano Super\nJetPack: 6.2\nPower mode: MAXN SUPER\nStudent: (your name)\n' > board_info.txt"
   say "The file now has four lines. nano opens next. Change the last line to your own name."
   say "Then press Ctrl + O, Enter, and Ctrl + X to save and exit."

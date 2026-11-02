@@ -15,11 +15,11 @@ PARTS=(
 )
 
 LABDIR="$(dirname "$SCRIPT")"
-WORK=~/jetson-labs/lab6
+WORK="$LAB_HOME"/lab6
 
 partA() {
   title "Part A, Step 1: Create the workspace and check OpenCV"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab6
   run cd lab6
   run 'python -c "import cv2, numpy; print(cv2.__version__, numpy.__version__)"'

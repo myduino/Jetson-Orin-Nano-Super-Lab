@@ -94,17 +94,21 @@ pip install "numpy<2" "cupy-cuda12x<14" "scipy>=1.11,<1.15" "onnx>=1.12.0,<2.0.0
 
 echo "== 5b. AI model files (Lab 7) =="
 # Downloaded once here, so the labs need no internet. Safe to run again (files that exist are not downloaded again).
-mkdir -p ~/jetson-labs/models
-( cd ~/jetson-labs/models && python -c "from ultralytics import YOLO; [YOLO(n) for n in ('yolo26n-cls.pt', 'yolo26n.pt', 'yolo26s.pt')]" ) \
+mkdir -p ~/students/_shared/models ~/students/_shared/engines
+( cd ~/students/_shared/models && python -c "from ultralytics import YOLO; [YOLO(n) for n in ('yolo26n-cls.pt', 'yolo26n.pt', 'yolo26s.pt')]" ) \
   || echo "The model files did not download. Check the internet and run this script again, or tell your instructor."
 # The two sample pictures that come with Ultralytics (bus.jpg and zidane.jpg), kept beside the models
-( cd ~/jetson-labs/models && python -c "import glob, os, shutil, ultralytics; a = os.path.join(os.path.dirname(ultralytics.__file__), 'assets'); [shutil.copy(f, '.') for f in glob.glob(a + '/*.jpg')]" ) \
+( cd ~/students/_shared/models && python -c "import glob, os, shutil, ultralytics; a = os.path.join(os.path.dirname(ultralytics.__file__), 'assets'); [shutil.copy(f, '.') for f in glob.glob(a + '/*.jpg')]" ) \
   || echo "The sample pictures were not copied. Tell your instructor."
-echo "Model files in ~/jetson-labs/models: $(ls ~/jetson-labs/models/*.pt 2>/dev/null | wc -l) of 3"
+echo "Model files in ~/students/_shared/models: $(ls ~/students/_shared/models/*.pt 2>/dev/null | wc -l) of 3"
 
 echo "== 6. Lab workspace =="
-mkdir -p ~/jetson-labs
-for n in 1 2 3 4 5 6 7 8 9; do mkdir -p ~/jetson-labs/lab$n; done
+# Every student gets a folder of their own when they type "lab start" (~/students/<name>).
+# A folder from an earlier version of this course: keep the models, leave the rest where it is.
+if [ -d ~/jetson-labs ] && [ ! -L ~/jetson-labs ]; then
+  for f in ~/jetson-labs/models/*; do [ -e "$f" ] && [ ! -e ~/students/_shared/models/"${f##*/}" ] && cp -R "$f" ~/students/_shared/models/; done
+  echo "Your old folder ~/jetson-labs was not changed. Copy files from it to your own folder if you need them."
+fi
 
 echo "== 7. Check =="
 python "$HERE/verify_setup.py"

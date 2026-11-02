@@ -10,18 +10,18 @@ PARTS=(
 )
 
 LABDIR="$(dirname "$SCRIPT")"
-WORK=~/jetson-labs/lab9
+WORK="$LAB_HOME"/lab9
 
 partA() {
   title "Part A, Step 1: Create the workspace"
-  run cd ~/jetson-labs
+  run cd "$LAB_HOME"
   run mkdir -p lab9
   run cd lab9
   # Copy what exists. A missing Lab 8 engine must not stop the lab: the program then uses yolo26n.pt (slower).
   if [ -f ../lab8/yolo26n_fp16.engine ]; then
     run cp ../lab8/yolo26n_fp16.engine .
   else
-    say "No FP16 engine found in ~/jetson-labs/lab8. That is fine: the program will use yolo26n.pt (slower)."
+    say "No FP16 engine found in $LAB_HOME/lab8. That is fine: the program will use yolo26n.pt (slower)."
     say "For the faster engine, run  lab 8 B  first (about 12 minutes), then  lab 9 A  again."
   fi
   if [ -f ../lab8/yolo26n.pt ]; then
@@ -42,7 +42,7 @@ partB() {
   title "Part B: Run the starter program"
   say "A window opens on the Jetson screen. Show objects to the camera. Press q in the window to quit."
   say "Run this on the Jetson desktop, not over SSH. Close other programs first."
-  say "Pictures and alerts.csv are saved in ~/jetson-labs/lab9. Use  lab 9 R  afterwards to see them."
+  say "Pictures and alerts.csv are saved in $LAB_HOME/lab9. Use  lab 9 R  afterwards to see them."
   pause
   run cd "$WORK"
   run python mini_project.py
@@ -51,7 +51,7 @@ partB() {
 }
 
 partR() {
-  title "The results in ~/jetson-labs/lab9"
+  title "The results in $LAB_HOME/lab9"
   run cd "$WORK"
   run "ls alert_*.jpg"
   run cat alerts.csv
