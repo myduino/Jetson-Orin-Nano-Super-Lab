@@ -37,7 +37,7 @@ partA() {
 
 partB() {
   title "Part B, Steps 1 and 2: Check CuPy"
-  run "pip list 2>/dev/null | grep -i -E '^(numpy|cupy|torch) '"
+  run "pip list 2>/dev/null | grep -i -E '^(numpy|cupy-cuda12x|torch) '"
   run 'python -c "import cupy as cp; print(cp.__version__); print(cp.arange(5) * 2)"'
   say "Step 3 (the GPU properties) is in the notebook. Open it with:  lab 5 A"
   pause
