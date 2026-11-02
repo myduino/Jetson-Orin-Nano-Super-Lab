@@ -1,6 +1,5 @@
 #!/bin/bash
-# Starts JupyterLab on the Jetson screen, in this lab folder:   bash run_jupyter.sh
+# Starts JupyterLab on the Jetson screen:   bash run_jupyter.sh      (same as:  lab start)
+# Add a lab number to open that lab's notebook:   bash run_jupyter.sh 5
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source ~/venvs/jetson/bin/activate 2>/dev/null || echo "Run 'bash setup.sh' first."
-cd "$HERE" || exit 1
-jupyter lab
+exec bash "$HERE/lab.sh" start "$@"

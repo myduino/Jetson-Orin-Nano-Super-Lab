@@ -130,9 +130,7 @@ partE() {
   say "The browser opens on the Jetson screen. Leave this terminal open while you use JupyterLab."
   say "To stop it later, come back here, press Ctrl + C and answer y."
   pause
-  mkdir -p "$WORK"
-  run cd "$WORK"
-  run jupyter lab
+  run bash "$HERE/run_jupyter.sh" 4
 }
 
 main() {

@@ -1,5 +1,7 @@
 #!/bin/bash
 # Runs the commands of one lab part for you.
+#   lab start      opens JupyterLab with the lab notebooks (lab start 5 opens Lab 5)
+#   lab reset 5    gives you a fresh copy of the Lab 5 notebook
 #   lab            shows the list of labs
 #   lab 2          shows the parts of Lab 2
 #   lab 2 C        runs Part C of Lab 2
@@ -24,8 +26,14 @@ TITLES=(
 
 find_script() { ls "$HERE"/labs/lab"$1"_*/lab"$1".sh 2>/dev/null | head -n 1; }
 
+case "$LAB" in
+  start) lab_start "$2"; exit $? ;;
+  reset) lab_reset "$2"; exit $? ;;
+esac
+
 if [ -z "$LAB" ]; then
   printf '\n%sMyduino Jetson Orin Nano Super Lab%s\n' "$CT" "$CN"
+  echo "Type  lab start  to open JupyterLab with all the lab notebooks."
   echo "Type  lab <number> <part>  to run a part, for example:  lab 2 C"
   echo
   for t in "${TITLES[@]}"; do

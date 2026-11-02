@@ -28,7 +28,7 @@ partA() {
   say "JupyterLab opens next, in the Lab 6 notebook folder. Leave this terminal open."
   say "To stop JupyterLab later, come back here, press Ctrl + C and answer y."
   pause
-  run bash "$HERE/run_jupyter.sh"
+  run bash "$HERE/run_jupyter.sh" 6
 }
 
 partB() {
