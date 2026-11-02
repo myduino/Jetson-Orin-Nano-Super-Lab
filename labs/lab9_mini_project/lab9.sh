@@ -1,12 +1,13 @@
 #!/bin/bash
-# Lab 9: Mini Project.   Run a part with:   lab 9 A   (or B, R)
-# Parts C, D and E are your own work: change the settings in mini_project.py with nano.
+# Lab 9: Mini Project.   The lab is in the notebook:   lab 9 N
+# The terminal version (mini_project.py) is for working without the notebook: lab 9 A, B, R. It has no email.
 
 LAB_TITLE="Mini Project"
 PARTS=(
-  "A|Create the workspace and copy the model files from Lab 8"
-  "B|Run the starter program (a window, or a link for your laptop browser)"
-  "R|Show the results: the alert pictures and alerts.csv"
+  "N|Open the Lab 9 notebook: the whole lab, with the Excel log and the email alerts"
+  "A|Terminal version: create the workspace and copy the model files from Lab 8"
+  "B|Terminal version: run the starter program (no email)"
+  "R|Terminal version: show the alert pictures and alerts.csv"
 )
 
 LABDIR="$(dirname "$SCRIPT")"
@@ -50,6 +51,10 @@ partB() {
   partR
 }
 
+partN() {
+  run bash "$HERE/run_jupyter.sh" 9
+}
+
 partR() {
   title "The results in $LAB_HOME/lab9"
   run cd "$WORK"
@@ -59,6 +64,7 @@ partR() {
 
 main() {
   case "$1" in
+    N) partN ;;
     A) partA ;;
     B) partB ;;
     R) partR ;;

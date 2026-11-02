@@ -21,6 +21,8 @@ if not os.path.exists(MODEL):
     print(f"{MODEL} not found, using yolo26n.pt instead (slower)")
     MODEL = "yolo26n.pt"
 model = YOLO(MODEL, task="detect")
+print("Using model:", MODEL)
+print("Pictures and alerts.csv are saved in:", os.getcwd())
 
 
 def analyse(frame):

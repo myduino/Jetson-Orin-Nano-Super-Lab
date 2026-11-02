@@ -21,7 +21,7 @@ sed -i '/^alias lab=/d' ~/.bashrc
 echo "alias lab='bash \"$HERE/lab.sh\"'" >> ~/.bashrc
 source ~/venvs/jetson/bin/activate
 pip install --upgrade pip
-pip install "numpy<2" jupyterlab ipywidgets
+pip install "numpy<2" jupyterlab ipywidgets openpyxl
 # OpenCV on the Jetson changes how the CPU handles tiny numbers, so NumPy prints a harmless
 # "smallest subnormal" warning. Hide only that one message in this environment.
 SITE="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
