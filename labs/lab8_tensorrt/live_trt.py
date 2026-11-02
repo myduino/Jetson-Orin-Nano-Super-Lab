@@ -1,6 +1,7 @@
 import sys
 import time
 import cv2
+from labview import Viewer, open_camera
 import torch
 from ultralytics import YOLO
 
@@ -9,12 +10,8 @@ name = sys.argv[1] if len(sys.argv) > 1 else "yolo26n_fp16.engine"
 model = YOLO(name, task="detect")
 print("Using model:", name)
 
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-if not cap.isOpened():
-    raise SystemExit("Cannot open the camera.")
+cap = open_camera()
+view = Viewer()
 
 conf = 0.40
 fps = 0.0
@@ -44,8 +41,8 @@ while True:
     cv2.putText(shown, summary, (10, 58),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
-    cv2.imshow("Myduino Live Detection", shown)
-    key = cv2.waitKey(1) & 0xFF
+    view.show("Myduino Live Detection", shown)
+    key = view.key()
     if key == ord("q"):
         break
     elif key in (ord("+"), ord("=")):
@@ -57,4 +54,4 @@ while True:
         print("Saved live_saved.jpg")
 
 cap.release()
-cv2.destroyAllWindows()
+view.close()

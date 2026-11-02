@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 
 import cv2
+from labview import Viewer, open_camera
 import torch
 from ultralytics import YOLO
 
@@ -41,12 +42,8 @@ def log_alert(count):
 
 
 def main():
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    if not cap.isOpened():
-        raise SystemExit("Cannot open the camera.")
+    cap = open_camera()
+    view = Viewer()
 
     fps = 0.0
     last = time.perf_counter()
@@ -79,12 +76,12 @@ def main():
                 print(f"ALERT: {count} {TARGET} at {stamp}")
                 last_alert = now
 
-        cv2.imshow("Myduino Mini Project", shown)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        view.show("Myduino Mini Project", shown)
+        if view.key() == ord("q"):
             break
 
     cap.release()
-    cv2.destroyAllWindows()
+    view.close()
 
 
 if __name__ == "__main__":

@@ -1,11 +1,9 @@
 import cv2
+from labview import Viewer, open_camera
 import numpy as np
 
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-if not cap.isOpened():
-    raise SystemExit("Cannot open the camera.")
+cap = open_camera(mjpg=False)
+view = Viewer()
 
 # Blue objects. Change these numbers to track another colour.
 low = np.array([100, 120, 70])
@@ -30,10 +28,10 @@ while True:
             cv2.putText(frame, f"centre ({x + w // 2}, {y + h // 2})", (x, y - 8),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    cv2.imshow("Myduino Colour Tracker", frame)
-    cv2.imshow("Mask", mask)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
+    view.show("Myduino Colour Tracker", frame)
+    view.show("Mask", mask)
+    if view.key() == ord("q"):
         break
 
 cap.release()
-cv2.destroyAllWindows()
+view.close()

@@ -2,6 +2,7 @@ import os
 import time
 
 import cv2
+from labview import Viewer, open_camera
 import torch
 from ultralytics import YOLO
 
@@ -100,12 +101,8 @@ def draw(img, game, fps, now, conf):
 
 
 def main():
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    if not cap.isOpened():
-        raise SystemExit("Cannot open the camera. Check the USB cable.")
+    cap = open_camera()
+    view = Viewer()
 
     game = Game(CHALLENGE_SECONDS)
     conf = CONFIDENCE
@@ -126,9 +123,9 @@ def main():
 
         shown = cv2.resize(shown, None, fx=SCALE, fy=SCALE)
         draw(shown, game, fps, now, conf)
-        cv2.imshow("Myduino AI Vision Demo", shown)
+        view.show("Myduino AI Vision Demo", shown)
 
-        key = cv2.waitKey(1) & 0xFF
+        key = view.key()
         if key == ord("q"):
             break
         if key in (ord("+"), ord("=")):
@@ -141,7 +138,7 @@ def main():
             game.start(now)
 
     cap.release()
-    cv2.destroyAllWindows()
+    view.close()
 
 
 if __name__ == "__main__":

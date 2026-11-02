@@ -21,11 +21,13 @@ sed -i '/^alias lab=/d' ~/.bashrc
 echo "alias lab='bash \"$HERE/lab.sh\"'" >> ~/.bashrc
 source ~/venvs/jetson/bin/activate
 pip install --upgrade pip
-pip install "numpy<2" jupyterlab
+pip install "numpy<2" jupyterlab ipywidgets
 # OpenCV on the Jetson changes how the CPU handles tiny numbers, so NumPy prints a harmless
 # "smallest subnormal" warning. Hide only that one message in this environment.
 SITE="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 echo 'import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")' > "$SITE/myduino_quiet.pth"
+# The lab programs and notebooks import labview (camera and live video). This makes it available everywhere in the environment.
+echo "$HERE/labs" > "$SITE/myduino_labs.pth"
 
 echo "== 3. CuPy (Lab 5) =="
 # CuPy 14 needs NumPy 2, but the Jetson libraries need NumPy 1, so use CuPy 13

@@ -1,12 +1,9 @@
 import time
 import cv2
+from labview import Viewer, open_camera
 
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-if not cap.isOpened():
-    raise SystemExit("Cannot open the camera.")
+cap = open_camera()
+view = Viewer()
 
 mode = "normal"
 fps = 0.0
@@ -34,8 +31,8 @@ while True:
     cv2.putText(shown, f"{mode}  {fps:.0f} FPS", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, 255 if mode in ("gray", "edges") else (0, 255, 0), 2)
 
-    cv2.imshow("Myduino Live", shown)
-    key = cv2.waitKey(1) & 0xFF
+    view.show("Myduino Live", shown)
+    key = view.key()
     if key == ord("q"):
         break
     elif key == ord("n"):
@@ -51,4 +48,4 @@ while True:
         print("Saved saved.png")
 
 cap.release()
-cv2.destroyAllWindows()
+view.close()
