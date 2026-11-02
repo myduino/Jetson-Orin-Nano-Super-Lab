@@ -72,6 +72,7 @@ partB() {
   run htop
   title "Part B, Step 4: Remove and reinstall"
   run sudo apt remove htop -y
+  hash -r   # forget the old htop path, so the shell says: command not found
   say "htop should now say: command not found."
   run htop
   run sudo apt install htop -y
