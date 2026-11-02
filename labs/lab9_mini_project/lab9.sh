@@ -17,10 +17,22 @@ partA() {
   run cd ~/jetson-labs
   run mkdir -p lab9
   run cd lab9
-  run cp ../lab8/yolo26n_fp16.engine ../lab8/yolo26n.pt .
+  # Copy what exists. A missing Lab 8 engine must not stop the lab: the program then uses yolo26n.pt (slower).
+  if [ -f ../lab8/yolo26n_fp16.engine ]; then
+    run cp ../lab8/yolo26n_fp16.engine .
+  else
+    say "No FP16 engine found in ~/jetson-labs/lab8. That is fine: the program will use yolo26n.pt (slower)."
+    say "For the faster engine, run  lab 8 B  first (about 12 minutes), then  lab 9 A  again."
+  fi
+  if [ -f ../lab8/yolo26n.pt ]; then
+    run cp ../lab8/yolo26n.pt .
+  elif [ -f ../models/yolo26n.pt ]; then
+    run cp ../models/yolo26n.pt .
+  else
+    say "yolo26n.pt was not found. Run  bash ~/Jetson-Orin-Nano-Super-Lab/setup.sh  or ask your instructor."
+  fi
   [ -f "$WORK/mini_project.py" ] || cp "$LABDIR/mini_project.py" "$WORK/mini_project.py"
   run ls
-  say "If the engine is missing, ask your instructor for one, or go on with yolo26n.pt only (slower)."
   pause
 }
 
