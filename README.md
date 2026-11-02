@@ -11,14 +11,17 @@ git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
 cd Jetson-Orin-Nano-Super-Lab
 bash setup.sh        # once, needs internet, takes a while
 bash run_demo.sh     # Lab 0 AI vision demo
-bash run_jupyter.sh  # notebooks for the labs
+lab start            # (new terminal) JupyterLab with the lab notebooks
 ```
 
 No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
 
-After setup, open a **new terminal**. A helper called `lab` types the lab commands for you:
+After setup, open a **new terminal**. Every time you start the Jetson, open a terminal and type `lab start`. JupyterLab opens on a Start Here page with all the lab notebooks. Your own copies are saved in `~/jetson-labs`, so updating this folder never changes your answers. `lab reset 4` gives you a fresh copy of the Lab 4 notebook.
+
+A helper called `lab` also types the lab commands for you:
 
 ```bash
+lab start    # open JupyterLab with the lab notebooks
 lab          # list of the labs and their parts
 lab 2        # the parts of Lab 2
 lab 2 A      # run Part A of Lab 2
