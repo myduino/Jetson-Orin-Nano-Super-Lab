@@ -8,6 +8,7 @@
 # Teacher:
 #   lab clean siti        delete the folder of a student     lab clean   lists the students
 #   lab check             reset the board for the next session
+#   lab mail              set the mail account that sends the alert emails of Lab 9  (lab mail test <address>)
 #   lab stop siti         free the JupyterLab and the camera of a student whose connection was lost
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB="$1"
@@ -35,6 +36,7 @@ case "$LAB" in
   reset)        ensure_student && lab_reset "$2"; exit $? ;;
   cameras)      echo "Cameras plugged in:"; cameras_show; exit 0 ;;
   stop)         lab_stop "$2"; exit $? ;;
+  mail)         lab_mail "$2" "$3"; exit $? ;;
   clean)        lab_clean "$2"; exit $? ;;
   check)        lab_check "$2"; exit $? ;;
 esac

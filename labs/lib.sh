@@ -247,6 +247,19 @@ session_cleanup() {
   [ -n "$SESSION_RC" ] && rm -f "$SESSION_RC"
 }
 
+# lab_link [N]: inside a session the JupyterLab already runs, so show the link of Start_Here or of the notebook of lab N
+lab_link() {
+  local n b path="lab/tree/Start_Here.ipynb"
+  n="$(basename "$LAB_HOME")"
+  if [ -n "$1" ]; then
+    b="$(basename "$(notebook_of "$1")" 2>/dev/null)"
+    if [ -n "$b" ] && [ "$b" != "." ]; then path="lab/tree/lab$1/$b"; else echo "Lab $1 has no notebook yet. Here is Start_Here."; fi
+  fi
+  sync_notebooks
+  echo "Your JupyterLab is running. Open this link in the browser of your laptop:"
+  echo "  http://$(my_ip):$(cat "$SHARE_DIR/$n.port")/$path?token=$(cat "$SHARE_DIR/$n.token")"
+}
+
 # lab_start [NAME] [camera N] [LAB]
 lab_start() {
   local name="" labn="" cam="" prev="" a first="Start_Here.ipynb" b dev rc ip stream
@@ -259,6 +272,12 @@ lab_start() {
     esac
   done
   [ "$prev" = camera ] && { echo "Which camera?  Type  lab cameras  to see the numbers."; return 1; }
+  if [ -n "$LAB_IN_SESSION" ]; then      # we are inside the shell of a session: do not start a second one
+    if [ -n "$name" ] && [ "$(clean_name "$name")" != "$(basename "$LAB_HOME")" ]; then
+      echo "You are working as $(basename "$LAB_HOME"). Type  exit  first, then  lab start $name"; return 1
+    fi
+    lab_link "$labn"; return $?
+  fi
   if [ -n "$name" ]; then choose_student "$name" || return 1; else ensure_student || return 1; fi
   if [ ! -f ~/venvs/jetson/bin/activate ]; then
     echo "The course environment is missing. Run  bash $HERE/setup.sh  first."; return 1
@@ -303,7 +322,7 @@ lab_start() {
   cat > "$rc" <<RCEOF
 [ -f ~/.bashrc ] && source ~/.bashrc
 source ~/venvs/jetson/bin/activate
-export LAB_HOME="$LAB_HOME" LAB_STREAM_PORT="$stream"
+export LAB_HOME="$LAB_HOME" LAB_STREAM_PORT="$stream" LAB_IN_SESSION=1
 ${LAB_CAMERA:+export LAB_CAMERA="$LAB_CAMERA"}
 export PYTHONPATH="$HERE/labs\${PYTHONPATH:+:\$PYTHONPATH}"
 cd "$LAB_HOME"
@@ -446,4 +465,51 @@ lab_check() {
   title "5. Students on this Jetson"
   for d in $(list_students); do printf '  %-14s %s\n' "$d" "$(du -sh "$STUDENTS/$d" 2>/dev/null | cut -f1)"; done
   echo "Delete a student with:  lab clean <name>"
+}
+
+# ---- Teacher: the mail account for the alert emails of Lab 9 ----
+# One spare account for the whole class. Students only type the address that receives the alerts.
+# The details are kept in ~/.lab_mail (only this Linux account can read it).
+lab_mail() {
+  local server port user pass
+  case "$1" in
+    test)
+      [ -n "$2" ] || { echo "Usage:  lab mail test <your address>"; return 1; }
+      [ -f ~/.lab_mail ] || { echo "No mail account yet. Type  lab mail  first."; return 1; }
+      source ~/venvs/jetson/bin/activate 2>/dev/null
+      python3 - "$2" <<'PY'
+import smtplib, sys
+from email.message import EmailMessage
+cfg = dict(line.rstrip("\n").split("=", 1) for line in open(__import__("os").path.expanduser("~/.lab_mail")) if "=" in line)
+msg = EmailMessage()
+msg["From"], msg["To"], msg["Subject"] = cfg["USER"], sys.argv[1], "Myduino Jetson: test email"
+msg.set_content("The mail account of the Jetson works. The alert emails of Lab 9 will arrive like this.")
+port = int(cfg.get("PORT", 465))
+try:
+    server = smtplib.SMTP_SSL(cfg["SERVER"], port, timeout=20) if port == 465 else smtplib.SMTP(cfg["SERVER"], port, timeout=20)
+    if port != 465:
+        server.starttls()
+    server.login(cfg["USER"], cfg["PASSWORD"]); server.send_message(msg); server.quit()
+    print("Sent. Look in the inbox (and the spam folder) of", sys.argv[1])
+except Exception as error:
+    print("FAILED:", error)
+    print("Check the internet, the server and port, and that the password is an APP password.")
+    sys.exit(1)
+PY
+      ;;
+    remove)
+      rm -f ~/.lab_mail; echo "The mail account was removed." ;;
+    *)
+      echo "This sets the account that sends the alert emails of Lab 9 for ALL students on this Jetson."
+      echo "Use a spare account just for the class, with an app password (not a main password)."
+      echo "Students can read this file, because they share one Linux account. Do not use a personal account."
+      read -r -p "SMTP server [smtp.gmail.com]: " server; server="${server:-smtp.gmail.com}"
+      read -r -p "SMTP port [465]: " port; port="${port:-465}"
+      read -r -p "Sender email address: " user
+      read -r -s -p "App password: " pass; echo
+      [ -n "$user" ] && [ -n "$pass" ] || { echo "Nothing saved."; return 1; }
+      ( umask 077; printf 'SERVER=%s\nPORT=%s\nUSER=%s\nPASSWORD=%s\n' "$server" "$port" "$user" "$pass" > ~/.lab_mail )
+      chmod 600 ~/.lab_mail
+      echo "Saved. Test it with:  lab mail test <your address>" ;;
+  esac
 }
