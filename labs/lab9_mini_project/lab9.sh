@@ -1,12 +1,12 @@
 #!/bin/bash
 # Lab 9: Mini Project.   The lab is in the notebook:   lab 9 N
-# The terminal version (mini_project.py) is for working without the notebook: lab 9 A, B, R. It has no email.
+# The terminal version (mini_project.py) is for working without the notebook: lab 9 A, B, R. It writes alerts.csv only (the notebook also writes an Excel file).
 
 LAB_TITLE="Mini Project"
 PARTS=(
-  "N|Open the Lab 9 notebook: the whole lab, with the Excel log and the email alerts"
+  "N|Open the Lab 9 notebook: the whole lab, with the Excel log"
   "A|Terminal version: create the workspace and copy the model files from Lab 8"
-  "B|Terminal version: run the starter program (no email)"
+  "B|Terminal version: run the starter program (CSV log only)"
   "R|Terminal version: show the alert pictures and alerts.csv"
 )
 

@@ -81,11 +81,8 @@ lab clean                 # list the students and their folder sizes
 lab clean siti            # delete one student's folder (ask them to copy their work first)
 lab stop siti             # free the JupyterLab and camera of a student whose connection was lost
 lab check                 # reset the board for the next session
-lab mail                  # once: the spare mail account that sends the Lab 9 alert emails
-lab mail test you@example.com   # send a test email
 ```
 
-- **Lab 9 alert emails:** run `lab mail` once. It asks for the SMTP server, the port, the sender address and an app password, and keeps them in `~/.lab_mail`. Use a spare account made for the class (for Gmail: turn on 2-step verification and make an app password), never a personal account: the students share the Linux account and could read the file. Students only type their own address in the Lab 9 notebook. The Jetson needs internet for the emails. `lab mail test <your address>` checks it. If no class account is set up, the notebook asks the student for a spare account instead.
 - Cameras are numbered 0, 1, 2 in the order they are found. A camera can be used by one student at a time. A student who asks for a camera that is taken gets a message.
 - Each student builds their own TensorRT engines in Lab 8. Only one build runs at a time, because a build uses most of the 8 GB memory. The next student waits.
 - `lab check` shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history, shows the running students and lists the folders.
