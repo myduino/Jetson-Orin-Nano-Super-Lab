@@ -51,6 +51,8 @@ The manuals still show every command, so you can also type them yourself.
 
 If you break something, delete this folder and clone it again. Your own work is in `~/jetson-labs`.
 
+The notebooks of Labs 5, 6 and 7 (and the pictures they save) are inside this folder. Copy `labs/lab5_cuda`, `labs/lab6_opencv` and `labs/lab7_ai_vision` to a safe place first if you want to keep your results.
+
 ## Status
 
 Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9.
