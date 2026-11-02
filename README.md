@@ -11,17 +11,17 @@ git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
 cd Jetson-Orin-Nano-Super-Lab
 bash setup.sh        # once, needs internet, takes a while
 bash run_demo.sh     # Lab 0 AI vision demo
-lab start            # (new terminal) JupyterLab with the lab notebooks
+lab start yourname   # (new terminal) your JupyterLab with the lab notebooks
 ```
 
 No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
 
-After setup, open a **new terminal**. Every time you start the Jetson, open a terminal and type `lab start`. JupyterLab opens on a Start Here page with all the lab notebooks. It asks for your name (use the same name every time). Your own copies are saved in your own folder, `~/students/<your name>`, so updating this folder never changes your answers and other students on the same Jetson cannot overwrite your work. `lab reset 4` gives you a fresh copy of the Lab 4 notebook.
+After setup, open a **new terminal**. Every time you work, open a terminal (or connect with `ssh orin_nano@<address of the Jetson>`) and type `lab start yourname camera 0` (use the same name every time, and the camera number your teacher gives you). It prints a link: open it in the browser and the Start Here page with all the lab notebooks appears. Type `exit` when you finish. Your own copies are saved in your own folder, `~/students/<your name>`, so updating this folder never changes your answers and other students on the same Jetson cannot overwrite your work. `lab reset 4` gives you a fresh copy of the Lab 4 notebook.
 
 A helper called `lab` also types the lab commands for you:
 
 ```bash
-lab start    # open JupyterLab with the lab notebooks
+lab start yourname camera 0   # your folder, your camera and your JupyterLab
 lab          # list of the labs and their parts
 lab 2        # the parts of Lab 2
 lab 2 A      # run Part A of Lab 2
@@ -62,18 +62,30 @@ Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9.
 
 ## For the Teacher
 
-Several students can use one Jetson in different sessions, each with their own folder.
+Several students can use one Jetson at the same time (2 to 3 is the safe number), each from their own laptop over SSH, and different students can use it in different sessions.
+
+**What the student does** (the same every time):
 
 ```bash
-lab share ali siti budi   # one JupyterLab for each student's laptop, with a secret link each
-lab share                 # show the links again       lab share stop   # stop them
-lab share-engine          # share the TensorRT engines you built in Lab 8 (students copy them in seconds)
+ssh orin_nano@<address of the Jetson>     # on the laptop
+lab start siti camera 0                   # on the Jetson: siti's folder, camera 0, siti's JupyterLab
+```
+
+`lab start` prints a JupyterLab link for the student's laptop browser and gives a shell with the Python environment on and the prompt `(siti)`. Typing `exit` stops that student's JupyterLab and frees the camera. Programs that show live video print a second link for the browser, and the keys are pressed in the terminal.
+
+**What the teacher does:**
+
+```bash
+lab cameras               # the cameras that are plugged in (up to 3) and who uses them
 lab clean                 # list the students and their folder sizes
 lab clean siti            # delete one student's folder (ask them to copy their work first)
+lab stop siti             # free the JupyterLab and camera of a student whose connection was lost
 lab check                 # reset the board for the next session
 ```
 
-- `lab check` shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history, stops the shared servers and lists the students.
-- Share a Jetson between 2 to 3 students at a time. Labs 4 and 5 can go up to 4. The camera labs (6, 7 Part D, 8 Part D, 9) and all the timing tests need the board to themselves.
-- Anyone who has a student's link can run commands on the Jetson. Give each student only their own link, on a classroom network.
-- The model files and the shared engines are in `~/students/_shared`.
+- Cameras are numbered 0, 1, 2 in the order they are found. A camera can be used by one student at a time. A student who asks for a camera that is taken gets a message.
+- Each student builds their own TensorRT engines in Lab 8. Only one build runs at a time, because a build uses most of the 8 GB memory. The next student waits.
+- `lab check` shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history, shows the running students and lists the folders.
+- The camera labs (6, 7 Part D, 8 Part D, 9) and all the timing tests (Lab 5 F, Lab 7 E, Lab 8 C and E) give the best results when only one student runs them at a time.
+- Anyone who has a student's JupyterLab link can run commands on the Jetson. Use a classroom network.
+- The model files are in `~/students/_shared`.
