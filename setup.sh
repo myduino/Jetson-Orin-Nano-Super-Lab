@@ -36,6 +36,23 @@ echo "== 4. PyTorch with GPU =="
 gpu_ok() { python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() and float((torch.ones(64,64,device='cuda')@torch.ones(64,64,device='cuda')).sum())==262144.0 else 1)" 2>/dev/null; }
 # True if PyTorch imports and reports a GPU (even if the test calculation failed)
 sees_gpu() { python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; }
+# Newer PyTorch builds from the Jetson index need the cuDSS library, which plain JetPack does not include.
+# This installs it into the course environment and makes the environment find it.
+needs_cudss() { python -c "import torch" 2>&1 | grep -q "libcudss"; }
+# Makes every new "jet" session find cuDSS (the line is added to the environment once)
+persist_cudss() {
+  CUDSS_DIR="$(dirname "$(find ~/venvs/jetson -name 'libcudss.so.0' | head -n 1)")"
+  [ -d "$CUDSS_DIR" ] || return 1
+  grep -q "CUDSS_DIR" ~/venvs/jetson/bin/activate || echo "export LD_LIBRARY_PATH=\"$CUDSS_DIR:\$LD_LIBRARY_PATH\"  # CUDSS_DIR (added by setup.sh)" >> ~/venvs/jetson/bin/activate
+  export LD_LIBRARY_PATH="$CUDSS_DIR:$LD_LIBRARY_PATH"
+}
+fix_cudss() {
+  echo "PyTorch needs the cuDSS library. Installing it into the course environment."
+  pip install "nvidia-cudss-cu12==0.7.1.6" --no-deps || return 1
+  persist_cudss
+}
+# A PyTorch from an earlier run may be installed but only missing cuDSS
+if ! gpu_ok && needs_cudss; then fix_cudss; fi
 if gpu_ok; then
   echo "PyTorch with GPU support is already installed."
 elif sees_gpu; then
@@ -51,16 +68,20 @@ else
   echo "Installing the Jetson build of PyTorch (JetPack 6.2, CUDA 12.6). This is a large download."
   pip install torch torchvision --index-url https://pypi.jetson-ai-lab.io/jp6/cu126 --force-reinstall
   pip install "numpy<2"
+  if needs_cudss; then fix_cudss; fi
   if gpu_ok; then
     echo "PyTorch with GPU support is working."
   else
     echo
     echo "PyTorch is installed but cannot run on the GPU (or the install failed)."
-    echo "A missing library (for example cuDSS) can cause this. Run: python -c \"import torch\" and send the message to your instructor."
+    echo "A missing library can cause this. Run: python -c \"import torch\" and send the message to your instructor."
     echo "Do NOT run a plain 'pip install torch'. Tell your instructor what is shown above."
     exit 1
   fi
 fi
+
+# If cuDSS is already in the environment (for example from an earlier run), make sure it is found in every session
+if find ~/venvs/jetson -name 'libcudss.so.0' 2>/dev/null | grep -q .; then persist_cudss; fi
 
 echo "== 5. Ultralytics =="
 # -U because an older Ultralytics may already be on the board and YOLO26 needs a recent one
