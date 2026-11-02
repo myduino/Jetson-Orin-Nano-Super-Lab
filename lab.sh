@@ -1,17 +1,14 @@
 #!/bin/bash
 # Runs the commands of one lab part for you.
-#   lab start      asks your name, then opens JupyterLab with your lab notebooks (lab start 5 opens Lab 5)
+#   lab start siti camera 0   starts your environment: your folder, your camera, your JupyterLab, a ready shell
+#                             (type exit when you finish). Without "camera 0" no camera is chosen.
+#   lab cameras    lists the cameras that are plugged in and who uses them
 #   lab me         shows who you are and where your folder is
 #   lab reset 5    gives you a fresh copy of the Lab 5 notebook
 # Teacher:
-#   lab share ali siti    JupyterLab for each student's laptop (lab share, lab share stop)
 #   lab clean siti        delete the folder of a student     lab clean   lists the students
 #   lab check             reset the board for the next session
-#   lab share-engine      share the TensorRT engines built in Lab 8
-#   lab            shows the list of labs
-#   lab 2          shows the parts of Lab 2
-#   lab 2 C        runs Part C of Lab 2
-# (The "lab" shortcut is made by setup.sh. Open a new terminal after setup.)
+#   lab stop siti         free the JupyterLab and the camera of a student whose connection was lost
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB="$1"
 PART="$(echo "$2" | tr a-z A-Z)"
@@ -36,10 +33,10 @@ case "$LAB" in
   start)        lab_start "${@:2}"; exit $? ;;
   me)           ensure_student && echo "You are $(basename "$LAB_HOME"). Your folder: $LAB_HOME"; exit $? ;;
   reset)        ensure_student && lab_reset "$2"; exit $? ;;
-  share)        lab_share "${@:2}"; exit $? ;;
+  cameras)      echo "Cameras plugged in:"; cameras_show; exit 0 ;;
+  stop)         lab_stop "$2"; exit $? ;;
   clean)        lab_clean "$2"; exit $? ;;
   check)        lab_check "$2"; exit $? ;;
-  share-engine) ensure_student && lab_share_engine "$2"; exit $? ;;
 esac
 
 if [ -z "$LAB" ]; then
@@ -70,6 +67,7 @@ fi
 
 ensure_student || exit 1
 export EXTRA="$3"
+export PYTHONPATH="$HERE/labs${PYTHONPATH:+:$PYTHONPATH}"
 source ~/venvs/jetson/bin/activate 2>/dev/null
 LABNUM="$LAB"
 source "$SCRIPT"

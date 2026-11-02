@@ -1,6 +1,6 @@
 #!/bin/bash
 # Lab 8: Optimisation with TensorRT.   Run a part with:   lab 8 A   (or B, C, D, E)
-# Part B copies the engines your teacher shared (lab share-engine). To build your own:   lab 8 B build
+# Part B builds your own engines. If another student is building, you wait (the memory fits one build).
 # Everything in this lab runs in the terminal. Close JupyterLab first to free memory.
 
 LAB_TITLE="Optimisation with TensorRT"
@@ -8,7 +8,7 @@ PARTS=(
   "A|Create the workspace, check TensorRT and the power mode"
   "B|Build the FP32 and FP16 engines (takes about 12 minutes)"
   "C|Benchmark: compare speed of the model and the engines"
-  "D|Live FPS with TensorRT (a window opens on the Jetson screen)"
+  "D|Live FPS with TensorRT (a window, or a link for your laptop browser)"
   "E|Speed and power modes (switches 15W, 25W and MAXN SUPER, about 2 minutes)"
 )
 
@@ -44,22 +44,18 @@ partA() {
 
 partB() {
   prepare
-  if [ "$EXTRA" != "build" ] && [ -f "$SHARED/engines/yolo26n_fp32.engine" ] && [ -f "$SHARED/engines/yolo26n_fp16.engine" ]; then
-    title "Part B: The engines are already built"
-    say "Your teacher built them once for this Jetson. Copying takes seconds."
-    say "To build your own (about 12 minutes), type:  lab 8 B build"
-    run cd "$WORK"
-    run cp "$SHARED/engines/yolo26n_fp32.engine" "$SHARED/engines/yolo26n_fp16.engine" .
-    run "ls -lh *.engine"
-    pause
-    return
-  fi
   title "Part B, Step 1: Export the FP32 and FP16 engines"
+  say "Close your notebooks first (in JupyterLab: Kernel, Shut Down All Kernels). The build needs most of the memory."
   say "This takes about 4 minutes for FP32 and about 8 minutes for FP16. Do not close the terminal."
   say "Red or yellow lines starting with [TRT] are normal."
   pause
+  # Building uses most of the 8 GB memory, so students who share the Jetson build one after the other.
+  build_acquire
+  trap build_release EXIT INT TERM
   run cd "$WORK"
   run python export_trt.py
+  build_release
+  trap - EXIT INT TERM
   run "ls -lh *.engine *.onnx *.pt"
   pause
 }
@@ -75,8 +71,8 @@ partC() {
 partD() {
   prepare
   title "Part D: Live FPS with TensorRT"
-  say "Two runs, one after the other. A window opens each time. Press q in the window to quit."
-  say "Run this on the Jetson desktop, not over SSH. Read the FPS on the screen for each run."
+  say "Two runs, one after the other. Press q to quit each run."
+  say "On the Jetson's own screen a window opens (press q in it). Over SSH, open the link that the program prints in the browser of your laptop and press the keys here in the terminal. Read the FPS on the screen for each run."
   pause
   run cd "$WORK"
   say "Run 1: the plain PyTorch model"

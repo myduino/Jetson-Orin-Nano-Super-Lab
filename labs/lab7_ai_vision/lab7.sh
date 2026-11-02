@@ -7,7 +7,7 @@ PARTS=(
   "A|Open the Lab 7 notebook (checks, sample pictures and models)"
   "B|In the notebook (start it with: lab 7 A)"
   "C|In the notebook (start it with: lab 7 A)"
-  "D|Live detection on the USB camera (a window opens on the Jetson screen)"
+  "D|Live detection on the USB camera (a window, or a link for your laptop browser)"
   "E|In the notebook (start it with: lab 7 A)"
 )
 
@@ -35,7 +35,7 @@ partD() {
   [ -f "$WORK/live_detect.py" ] || cp "$LABDIR/live_detect.py" "$WORK/live_detect.py"
   [ -f "$WORK/yolo26n.pt" ] || cp "$LAB_HOME"/models/yolo26n.pt "$WORK/" 2>/dev/null
   title "Part D, Step 1: Run live detection"
-  say "A window opens on the Jetson screen. Press q in the window to quit. Run this on the Jetson desktop, not over SSH."
+  say "On the Jetson's own screen a window opens (press q in it). Over SSH, open the link that the program prints in the browser of your laptop and press the keys here in the terminal."
   say "Close the notebook tab and stop JupyterLab first (Ctrl + C in its terminal) to free memory."
   pause
   run cd "$WORK"

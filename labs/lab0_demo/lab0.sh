@@ -9,7 +9,7 @@ PARTS=(
 
 partA() {
   title "Part A: Start the demo"
-  say "Wait about 20 seconds while the AI model loads. A window then opens with the camera picture."
+  say "Wait about 20 seconds while the AI model loads. A window then opens with the camera picture (over SSH: a link for your laptop browser)."
   run bash "$HERE/run_demo.sh"
 }
 

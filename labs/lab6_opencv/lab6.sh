@@ -10,8 +10,8 @@ PARTS=(
   "D|In the notebook (start it with: lab 6 A)"
   "E|In the notebook (start it with: lab 6 A)"
   "F|In the notebook (start it with: lab 6 A)"
-  "G|Live camera view with filters (a window opens on the Jetson screen)"
-  "T|Challenge: track a coloured object (a window opens)"
+  "G|Live camera view with filters (a window, or a link for your laptop browser)"
+  "T|Challenge: track a coloured object (a window, or a link for your laptop browser)"
 )
 
 LABDIR="$(dirname "$SCRIPT")"
@@ -37,7 +37,7 @@ partB() {
   run v4l2-ctl --list-devices
   pause
   title "Part B, Step 2: See what the camera can do"
-  run "v4l2-ctl -d /dev/video0 --list-formats-ext | head -30"
+  run "v4l2-ctl -d ${LAB_CAMERA:-/dev/video0} --list-formats-ext | head -30"
   pause
   say "Step 3 (capture a picture) is in the notebook. Open it with:  lab 6 A"
 }
@@ -50,7 +50,7 @@ partG() {
   mkdir -p "$WORK"
   [ -f "$WORK/live.py" ] || cp "$LABDIR/live.py" "$WORK/live.py"
   title "Part G, Step 1: A live view with filters"
-  say "A window opens on the Jetson screen. Press q in the window to quit. Run this on the Jetson desktop, not over SSH."
+  say "On the Jetson's own screen a window opens (press q in it). Over SSH, open the link that the program prints in the browser of your laptop and press the keys here in the terminal."
   pause
   run cd "$WORK"
   run python live.py
@@ -60,7 +60,7 @@ partT() {
   mkdir -p "$WORK"
   [ -f "$WORK/track.py" ] || cp "$LABDIR/track.py" "$WORK/track.py"
   title "Challenge: track a coloured object"
-  say "A window opens on the Jetson screen. Show a coloured object to the camera. Press q to quit."
+  say "Show a coloured object to the camera. Press q to quit. On the Jetson's own screen a window opens (press q in it). Over SSH, open the link that the program prints in the browser of your laptop and press the keys here in the terminal."
   pause
   run cd "$WORK"
   run python track.py

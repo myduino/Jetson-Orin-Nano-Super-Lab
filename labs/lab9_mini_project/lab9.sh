@@ -5,7 +5,7 @@
 LAB_TITLE="Mini Project"
 PARTS=(
   "A|Create the workspace and copy the model files from Lab 8"
-  "B|Run the starter program (a window opens on the Jetson screen)"
+  "B|Run the starter program (a window, or a link for your laptop browser)"
   "R|Show the results: the alert pictures and alerts.csv"
 )
 
@@ -40,8 +40,8 @@ partB() {
   mkdir -p "$WORK"
   [ -f "$WORK/mini_project.py" ] || cp "$LABDIR/mini_project.py" "$WORK/mini_project.py"
   title "Part B: Run the starter program"
-  say "A window opens on the Jetson screen. Show objects to the camera. Press q in the window to quit."
-  say "Run this on the Jetson desktop, not over SSH. Close other programs first."
+  say "Show objects to the camera. Press q to quit."
+  say "On the Jetson's own screen a window opens (press q in it). Over SSH, open the link that the program prints in the browser of your laptop and press the keys here in the terminal. Close other programs first."
   say "Pictures and alerts.csv are saved in $LAB_HOME/lab9. Use  lab 9 R  afterwards to see them."
   pause
   run cd "$WORK"
