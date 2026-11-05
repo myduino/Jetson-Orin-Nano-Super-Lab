@@ -28,6 +28,7 @@ CONFIG = os.environ.get("LAB_AGENT_CONFIG", os.path.join(ROOT, ".agent.json"))
 SYSFS = os.environ.get("LAB_SYSFS", "/sys/class/video4linux")
 DEV = os.environ.get("LAB_DEV", "/dev")
 NAME = re.compile(r"^[a-z0-9_]{1,20}$")
+GRACE = 15 * 60                                                         # seconds without the teacher before every student session is closed
 EVERY = 5                                                               # seconds between two reports
 
 running = {}          # key -> {"proc", "port", "pin", "camera", "started"}
@@ -258,10 +259,12 @@ def main():
     signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
     log("agent started; teacher", cfg["teacher"])
     shown = ""
+    last_ok = time.time()
     try:
         while True:
             try:
                 answer = hello(cfg)
+                last_ok = time.time()
                 for d in answer.get("delete", []):
                     delete_folder(str(d.get("class", "")), str(d.get("student", "")))
                 reconcile(answer.get("plan", []))
@@ -270,6 +273,10 @@ def main():
                 if str(error) != shown:                                      # say it once, not every 5 seconds
                     log("cannot reach the teacher server:", error)
                     shown = str(error)
+                if running and time.time() - last_ok > GRACE:                # the teacher PC is gone: close the lab
+                    log("no news from the teacher for", GRACE // 60, "minutes: stopping all student sessions")
+                    for key in list(running):
+                        stop(key)
             time.sleep(EVERY)
     finally:
         for key in list(running):
