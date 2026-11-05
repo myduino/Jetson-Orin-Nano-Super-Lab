@@ -8,6 +8,7 @@ their folder (.venv), made by the agent the first time. Only the Python standard
 
     python3 labs-student/agent.py            (the service does this)
 """
+import glob
 import json
 import os
 import re
@@ -128,6 +129,9 @@ def prepare(home):
                     f"alias lab='bash {os.path.join(HERE, 'lab.sh')}'\ncd \"$HOME\" 2>/dev/null\n")
     with open(os.path.join(home, ".bash_profile"), "w") as f:
         f.write('[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n')
+    for pth in glob.glob(os.path.join(home, ".venv", "lib", "python*", "site-packages", "myduino_labs.pth")):   # keep the path right if the course folder moves
+        with open(pth, "w") as f:
+            f.write(os.path.join(HERE, "labs-student") + "\n")
     shutil.copyfile(os.path.join(HERE, "labs-student", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
     labs = os.path.join(HERE, "labs-student")
     for folder in sorted(os.listdir(labs)):
