@@ -70,6 +70,14 @@ def sudo_login():
 
 
 # ---------------------------------------------------------------- taking turns
+def _lock_path(name):
+    """Locks shared by all the students of this Jetson live in the lab folder (a student's ~ is their own folder)."""
+    root = os.environ.get("LAB_ROOT") or os.path.join(os.path.expanduser("~"), "myduino-jetson-lab")
+    folder = os.path.join(root, ".locks")
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, name)
+
+
 class _Lock:
     """A lock shared by all students of this Jetson. A folder is the lock; its owner file says who has it."""
     path = ""
@@ -108,7 +116,7 @@ class _Lock:
 
 class build_lock(_Lock):
     """with build_lock():  ...   Building a TensorRT engine uses most of the memory, so students take turns."""
-    path = os.path.expanduser("~/.lab_build.lock")
+    path = property(lambda self: _lock_path("build.lock"))
     waiting = "building an engine"
     reason = "Only one build at a time fits in the 8 GB memory,"
 
@@ -121,7 +129,7 @@ def setup_begin():
     global _setup
 
     class setup_lock(_Lock):
-        path = os.path.expanduser("~/.lab_setup.lock")
+        path = property(lambda self: _lock_path("setup.lock"))
         waiting = "installing the course packages"
         reason = "Two installs at the same time would break each other,"
 
@@ -135,7 +143,7 @@ def setup_begin():
 def setup_end():
     """Let the next student install. Works after a kernel restart too: it looks at the lock file, not at memory."""
     global _setup
-    lock = os.path.expanduser("~/.lab_setup.lock")
+    lock = _lock_path("setup.lock")
     me = f"{os.path.basename(os.environ.get('LAB_HOME', 'student'))} {os.getppid()}"
     try:
         if open(os.path.join(lock, "owner")).read().split() == me.split():

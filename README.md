@@ -49,9 +49,16 @@ No `git`? On GitHub press **Code, then Download ZIP** and extract it.
 
 The teacher page shows: every Jetson (online or not, IP address, cameras and who uses them), every class with every student's address, PIN and state (running or not), and buttons to make a class, add students, change a PIN, and remove a student or a class. If a Jetson was off, the students on it start again by themselves when it comes back.
 
-## The student folder is the environment
+## What the lab leaves on a Jetson
 
-`~/myduino-jetson-lab/<class>/<student>/` on the Jetson holds everything of one student: the notebooks, pictures, engines, the AI models, the Python environment (`.venv`, about 2 GB with PyTorch), and the Jupyter, IPython and shell settings. A student who installs or breaks a package only affects their own environment. Removing a student on the teacher page deletes all of it. Each student has their own port (8881, 8882, ...), which stays the same. Students share one Linux account, so a student could delete another's folder by hand: this is a classroom, not a secure system. Only the system programs installed by Part 0 of Lab 0 (OpenCV, camera tools, jtop) are shared.
+Only two folders of the lab live in the home folder of a Jetson:
+
+- `~/Jetson-Orin-Nano-Super-Lab`: the cloned repo (the code and the master notebooks).
+- `~/myduino-jetson-lab`: everything else, as `<class>/<student>/`, plus the agent's settings (`.agent.json`) and the shared locks (`.locks`).
+
+**The student folder is the environment.** `~/myduino-jetson-lab/<class>/<student>/` holds the notebooks, pictures, engines, the AI models, the Python environment (`.venv`, about 2 GB with PyTorch) and all the settings, caches, history and temporary files of one student. A student's JupyterLab and its Terminal tab run with `HOME` set to that folder, so `~` is the student folder and no program writes anywhere else. A student who installs or breaks a package only affects their own environment. Removing a student on the teacher page deletes all of it. Each student has their own port (8881, 8882, ...), which stays the same. Students share one Linux account, so a student could delete another's folder by hand: this is a classroom, not a secure system.
+
+Outside those two folders there are only two things, because Linux needs them: the system programs that Part 0 of Lab 0 installs with `apt` (OpenCV, camera tools, jtop, and so on), and one service file, `/etc/systemd/system/myduino-lab-agent.service`, that starts the agent when the Jetson starts. To remove the service: `sudo systemctl disable --now myduino-lab-agent && sudo rm /etc/systemd/system/myduino-lab-agent.service`.
 
 ## Course Flow
 
@@ -75,7 +82,7 @@ The teacher page shows: every Jetson (online or not, IP address, cameras and who
 - `labs/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
 - `labs/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs/lab0_demo/demo.py`: the Lab 0 AI vision game.
-- `lab.sh`, `labs/lib.sh`: the small `lab` command (`lab me`, `lab reset 4` in a JupyterLab Terminal tab; `lab cameras` and `lab check` for the teacher).
+- `lab.sh`, `labs/lib.sh`: the small `lab` command (`lab me` and `lab reset 4` in a JupyterLab Terminal tab, where `lab` is ready; for the teacher: `bash lab.sh cameras` and `bash lab.sh check` in this folder).
 - `verify_setup.py`: the check used by Lab 0.
 
 ## Notes for the teacher

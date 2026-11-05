@@ -21,14 +21,16 @@ echo "== 1. Python tools =="
 sudo apt update
 sudo apt install -y python3-venv python3-pip git curl
 
-echo "== 2. The lab command =="
-sed -i '/^alias lab=/d' ~/.bashrc
-echo "alias lab='bash \"$HERE/lab.sh\"'" >> ~/.bashrc
+echo "== 2. The lab folder =="
+# Only two folders of the lab live in the home folder: this one, and ~/myduino-jetson-lab (the students and the settings).
+# Older versions of this script wrote an alias into ~/.bashrc and a settings file in the home folder: remove them.
+sed -i '/^alias lab=/d;/^alias jet=/d' ~/.bashrc 2>/dev/null
+rm -f ~/.lab_agent.json
 mkdir -p ~/myduino-jetson-lab
 
 echo "== 3. The lab agent =="
-printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/.lab_agent.json
-chmod 600 ~/.lab_agent.json
+printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/myduino-jetson-lab/.agent.json
+chmod 600 ~/myduino-jetson-lab/.agent.json
 sudo tee /etc/systemd/system/myduino-lab-agent.service > /dev/null <<UNIT
 [Unit]
 Description=Myduino lab agent (starts the JupyterLab of the students)
@@ -59,4 +61,4 @@ fi
 echo
 echo "Setup finished. Next: the teacher puts a student on this Jetson, and the student opens the address from the teacher page."
 echo "Each student then runs Lab 0: Part 0 (system programs, once for this Jetson) and Part 0b (their own AI packages and models)."
-echo "Open a NEW terminal if you want to use the  lab  command (lab cameras, lab check)."
+echo "For the teacher commands type:  bash $HERE/lab.sh check   (or cameras)."

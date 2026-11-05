@@ -10,7 +10,7 @@ title() { printf '\n%s== %s ==%s\n' "$CT" "$*" "$CN"; }
 say()   { printf '%s%s%s\n' "$CT" "$*" "$CN"; }
 
 # The student folder is the whole environment of a student: ~/myduino-jetson-lab/<class>/<student>/
-ROOT="$HOME/myduino-jetson-lab"
+ROOT="${LAB_ROOT:-$HOME/myduino-jetson-lab}"          # LAB_ROOT is set inside a student's JupyterLab, where $HOME is the student folder
 
 # ensure_student: lab me and lab reset only work in a JupyterLab Terminal tab of a student (LAB_HOME is set there)
 ensure_student() {

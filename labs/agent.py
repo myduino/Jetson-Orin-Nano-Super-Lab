@@ -23,8 +23,8 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))       # the course folder
 HOME = os.path.expanduser("~")
-CONFIG = os.path.join(HOME, ".lab_agent.json")
-ROOT = os.path.join(HOME, "myduino-jetson-lab")
+ROOT = os.path.join(HOME, "myduino-jetson-lab")                          # everything of the lab: ROOT/<class>/<student>, ROOT/.agent.json
+CONFIG = os.environ.get("LAB_AGENT_CONFIG", os.path.join(ROOT, ".agent.json"))
 SYSFS = os.environ.get("LAB_SYSFS", "/sys/class/video4linux")
 DEV = os.environ.get("LAB_DEV", "/dev")
 NAME = re.compile(r"^[a-z0-9_]{1,20}$")
@@ -85,8 +85,10 @@ def make_venv(key, home):
     venv = venv_of(home)
     os.makedirs(os.path.join(home, ".jupyter"), exist_ok=True)
     with open(os.path.join(home, ".jupyter", "prepare.log"), "ab") as out:
+        env = student_env(home, os.path.basename(os.path.dirname(home)), "")     # pip and python write only inside the folder
+
         def run(*cmd):
-            subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, check=True)
+            subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, check=True, env=env, cwd=home)
         try:
             log("making the Python environment of", key.replace("__", "/"))
             shutil.rmtree(venv, ignore_errors=True)
@@ -94,7 +96,7 @@ def make_venv(key, home):
             run(os.path.join(venv, "bin", "pip"), "install", "--upgrade", "pip")
             run(os.path.join(venv, "bin", "pip"), "install", "numpy<2", "jupyterlab", "ipywidgets", "openpyxl")
             site = subprocess.run([os.path.join(venv, "bin", "python"), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
-                                  capture_output=True, text=True, check=True).stdout.strip()
+                                  capture_output=True, text=True, check=True, env=env).stdout.strip()
             # OpenCV on the Jetson makes NumPy print a harmless warning: hide only that one message.
             with open(os.path.join(site, "myduino_quiet.pth"), "w") as f:
                 f.write('import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")\n')
@@ -115,8 +117,16 @@ def make_venv(key, home):
 def prepare(home):
     for n in range(10):
         os.makedirs(os.path.join(home, f"lab{n}"), exist_ok=True)
-    for d in ("models", ".jupyter", ".ipython", ".config"):
+    for d in ("models", ".jupyter", ".ipython", ".config", ".tmp"):
         os.makedirs(os.path.join(home, d), exist_ok=True)
+    # The student's own bash: the Terminal tab of their JupyterLab starts in their folder, with their environment on.
+    rc = os.path.join(home, ".bashrc")
+    if "# myduino-lab" not in read(rc):
+        with open(rc, "a") as f:
+            f.write('# myduino-lab\n[ -f "$HOME/.venv/bin/activate" ] && source "$HOME/.venv/bin/activate"\n'
+                    f"alias lab='bash {os.path.join(HERE, 'lab.sh')}'\ncd \"$HOME\" 2>/dev/null\n")
+    with open(os.path.join(home, ".bash_profile"), "w") as f:
+        f.write('[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n')
     shutil.copyfile(os.path.join(HERE, "labs", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
     labs = os.path.join(HERE, "labs")
     for folder in sorted(os.listdir(labs)):
@@ -134,6 +144,9 @@ def student_env(home, cls, camera_device):
     env = dict(os.environ)
     venv = venv_of(home)
     env.update(
+        # HOME is the student folder, so everything the programs write (settings, caches, history, temporary files)
+        # lands in the student's own folder and nothing is left anywhere else on the Jetson.
+        HOME=home, TMPDIR=os.path.join(home, ".tmp"), PIP_NO_CACHE_DIR="1", LAB_ROOT=ROOT,
         VIRTUAL_ENV=venv, PATH=os.path.join(venv, "bin") + os.pathsep + env.get("PATH", ""),
         LAB_HOME=home, LAB_CLASS=cls, HISTFILE=os.path.join(home, ".bash_history"),
         JUPYTER_CONFIG_DIR=os.path.join(home, ".jupyter", "config"), JUPYTER_DATA_DIR=os.path.join(home, ".jupyter", "data"),
@@ -146,7 +159,7 @@ def student_env(home, cls, camera_device):
         env["LAB_CAMERA"] = camera_device
     else:
         env.pop("LAB_CAMERA", None)
-    for key in ("JUPYTER_CONFIG_DIR", "JUPYTER_DATA_DIR", "JUPYTER_RUNTIME_DIR", "JUPYTERLAB_SETTINGS_DIR", "JUPYTERLAB_WORKSPACES_DIR", "YOLO_CONFIG_DIR", "MPLCONFIGDIR"):
+    for key in ("TMPDIR", "JUPYTER_CONFIG_DIR", "JUPYTER_DATA_DIR", "JUPYTER_RUNTIME_DIR", "JUPYTERLAB_SETTINGS_DIR", "JUPYTERLAB_WORKSPACES_DIR", "YOLO_CONFIG_DIR", "MPLCONFIGDIR"):
         os.makedirs(env[key], exist_ok=True)
     return env
 
