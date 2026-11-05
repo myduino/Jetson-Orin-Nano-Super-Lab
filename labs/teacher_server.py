@@ -264,7 +264,7 @@ function render(s){
     const st = el('span', {className: j.online ? 'on' : 'off', textContent: j.online ? 'online' : 'offline (' + j.ago + ' s)'});
     jets.append(row([j.id, j.ip, el('span', {}, st, j.note ? el('span', {className:'warn', textContent:'  ' + j.note}) : ''), cams, String(j.students)]));
   });
-  $('addjet').innerHTML = 'To add a Jetson, run this on it: <code>cd ~/Jetson-Orin-Nano-Super-Lab && bash setup-lab.sh ' + s.ip + ':' + s.port + ' ' + s.key + '</code>';
+  $('addjet').innerHTML = 'To add a Jetson, run this on it: <code>cd ~/Jetson-Orin-Nano-Super-Lab && bash setup-lab.sh ' + s.ip + ':' + s.port + ' ' + s.key + ' jetson-01</code> (use a different name for each Jetson)';
   const box = $('classes'); box.replaceChildren();
   if (!s.classes.length) box.append(el('section', {}, el('p', {className:'note', textContent:'No class yet. Make one above.'})));
   s.classes.forEach(c => {
@@ -449,7 +449,7 @@ def main():
         threading.Thread(target=saver, daemon=True).start()
     print(f"\nTeacher page:   http://{server.ip}:{PORT}/    (on this PC also http://localhost:{PORT}/)")
     print(f"Class key:      {db['key']}")
-    print(f"On each Jetson: bash setup-lab.sh {server.ip}:{PORT} {db['key']}")
+    print(f"On each Jetson: bash setup-lab.sh {server.ip}:{PORT} {db['key']} <name, for example jetson-01>")
     print("Open the teacher page in the browser and type the password. Close this window or press Ctrl + C to stop.")
     try:
         server.serve_forever()

@@ -1,15 +1,19 @@
 #!/bin/bash
 # Run ONCE on each Jetson after cloning this folder:
-#     bash setup-lab.sh <teacher address:port> <class key>
+#     bash setup-lab.sh <teacher address:port> <class key> [name of this Jetson]
+# Give each Jetson a different name (for example jetson-01). Without one the name is made from the host name and a short
+# code of this Jetson, because Jetsons flashed from the same image have the same host name.
 # The teacher page prints the exact line (for example:  bash setup-lab.sh 192.168.0.10:8800 1a2b3c4d).
 # Needs internet. Safe to run again. It installs JupyterLab and the lab agent. The agent starts by itself whenever the
 # Jetson starts, reports to the teacher page, and starts each student's JupyterLab when the teacher assigns the student.
 # The rest of the setup (CuPy, PyTorch, Ultralytics) is done in the Lab 0 notebook, where the students can watch it.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEACHER="$1"; KEY="$2"
+TEACHER="$1"; KEY="$2"; NAME="$3"
 [ -n "$TEACHER" ] || read -r -p "Teacher page address (for example 192.168.0.10:8800): " TEACHER
 [ -n "$KEY" ] || read -r -p "Class key (shown on the teacher PC): " KEY
 case "$TEACHER" in *:*) ;; *) TEACHER="$TEACHER:8800" ;; esac
+if [ -z "$NAME" ]; then NAME="$(hostname | tr 'A-Z-' 'a-z_')_$(cut -c1-4 /etc/machine-id 2>/dev/null)"; fi
+NAME="$(printf '%s' "$NAME" | tr 'A-Z-' 'a-z_' | sed 's/[^a-z0-9_]/_/g' | cut -c1-20)"
 
 echo "== Myduino Jetson Orin Nano Super Lab: setup of this Jetson =="
 echo "== 1. Python tools =="
@@ -34,7 +38,7 @@ echo "$HERE/labs" > "$SITE/myduino_labs.pth"
 mkdir -p ~/myduino-jetson-lab
 
 echo "== 3. The lab agent =="
-printf '{"teacher": "%s", "key": "%s"}\n' "$TEACHER" "$KEY" > ~/.lab_agent.json
+printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/.lab_agent.json
 chmod 600 ~/.lab_agent.json
 sudo tee /etc/systemd/system/myduino-lab-agent.service > /dev/null <<UNIT
 [Unit]
