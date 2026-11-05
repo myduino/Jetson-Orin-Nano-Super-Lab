@@ -1,6 +1,6 @@
 """Camera and live-view helpers for the Myduino labs.
 
-open_camera()  opens the camera you chose with   lab start <name> class <class> camera <number>
+open_camera()  opens the camera your teacher chose for you on the teacher page
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
@@ -20,7 +20,7 @@ import cv2
 
 # ---------------------------------------------------------------- camera
 def camera_source():
-    """The camera of this student: a /dev/videoN path from lab start, or 0 when nothing was chosen."""
+    """The camera of this student: a /dev/videoN path chosen on the teacher page, or 0 when nothing was chosen."""
     choice = os.environ.get("LAB_CAMERA", "")
     if not choice:
         return 0
@@ -37,7 +37,7 @@ def open_camera(size=(640, 480), mjpg=True):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
     if not cap.isOpened():
         raise SystemExit("Cannot open the camera. Check the USB cable, close other programs that use it, "
-                         "and check the camera number with:  lab cameras")
+                         "and ask your teacher to check your camera on the teacher page")
     return cap
 
 
