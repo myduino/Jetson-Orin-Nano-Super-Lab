@@ -49,6 +49,8 @@ def sudo_login():
     The password lives only in this notebook's kernel. Restarting the kernel forgets it.
     """
     folder = tempfile.mkdtemp(prefix="labsudo_")
+    import atexit
+    atexit.register(shutil.rmtree, folder, True)        # the helper folder goes away with the kernel
     os.chmod(folder, stat.S_IRWXU)
     ask = os.path.join(folder, "askpass")
     shim = os.path.join(folder, "sudo")
