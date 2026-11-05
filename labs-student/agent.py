@@ -213,6 +213,10 @@ def delete_folder(cls, student):
     if os.path.dirname(os.path.dirname(target)) == os.path.realpath(ROOT) and os.path.isdir(target):
         shutil.rmtree(target, ignore_errors=True)
         log("deleted", f"{cls}/{student}")
+        try:
+            os.rmdir(os.path.join(ROOT, cls))                       # the class folder goes too, once the last student is gone
+        except OSError:
+            pass
     deleted.append(key)
 
 
