@@ -15,7 +15,7 @@ The teacher puts each student on a Jetson and a camera, on the teacher page. The
 
 ## Setup (once)
 
-**1. On the teacher's PC (Windows or Mac):** no Python, no Git and no terminal. Copy the app from the folder `myduino-jetson-lab/` of this repository:
+**1. On the teacher's PC (Windows or Mac):** no Python, no Git and no terminal. Copy the app from the folder `labs-teacher/` of this repository:
 
 - Windows: `myduino-jetson-lab.exe` (double-click; no install). If Windows asks about the network, choose Allow. If SmartScreen warns, choose More info, then Run anyway.
 - Mac with Apple chip (M1 or newer): `myduino-jetson-lab-mac-arm64.dmg`. Intel Mac: `myduino-jetson-lab-mac-x64.dmg`. Open it and drag the app to Applications. The first time, right-click the app, choose Open, then Open again (the app is not signed).
@@ -75,12 +75,12 @@ Outside those two folders there are only two things, because Linux needs them: t
 
 ## Folders
 
-- `labs/`: the master notebooks of the labs (`labs/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
-- `myduino-jetson-lab/`: the teacher app (Windows `.exe`, Mac `.dmg`). Only the built programs are kept here.
-- `labs/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
-- `labs/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
-- `labs/lab0_demo/demo.py`: the Lab 0 AI vision game.
-- `lab.sh`, `labs/lib.sh`: the small `lab` command (`lab me` and `lab reset 4` in a JupyterLab Terminal tab, where `lab` is ready; for the teacher: `bash lab.sh cameras` and `bash lab.sh check` in this folder).
+- `labs-student/`: the master notebooks of the labs (`labs-student/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
+- `labs-teacher/`: the teacher app (Windows `.exe`, Mac `.dmg`). Only the built programs are kept here.
+- `labs-student/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
+- `labs-student/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
+- `labs-student/lab0_demo/demo.py`: the Lab 0 AI vision game.
+- `lab.sh`, `labs-student/lib.sh`: the small `lab` command (`lab me` and `lab reset 4` in a JupyterLab Terminal tab, where `lab` is ready; for the teacher: `bash lab.sh cameras` and `bash lab.sh check` in this folder).
 - `verify_setup.py`: the check used by Lab 0.
 
 ## Notes for the teacher

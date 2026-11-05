@@ -6,6 +6,6 @@ __pycache__/
 *.onnx
 alerts.csv
 .DS_Store
-labs/**/*.png
-labs/**/*.jpg
-labs/**/*.jpeg
+labs-student/**/*.png
+labs-student/**/*.jpg
+labs-student/**/*.jpeg

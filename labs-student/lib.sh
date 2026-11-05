@@ -1,7 +1,7 @@
 #!/bin/bash
 # Helper functions of the lab command (lab.sh loads this file). Do not run it on its own.
 # The students do not use the lab command to start: the teacher puts each student on a Jetson (teacher page) and
-# the lab agent (labs/agent.py) starts the student's JupyterLab. The lab command is for small jobs on the Jetson.
+# the lab agent (labs-student/agent.py) starts the student's JupyterLab. The lab command is for small jobs on the Jetson.
 
 CT=$'\033[1;36m'   # headings
 CN=$'\033[0m'
@@ -20,7 +20,7 @@ ensure_student() {
 }
 
 # notebook_of N: path of the master notebook of lab N (empty if the lab has none)
-notebook_of() { ls "$HERE"/labs/lab"$1"_*/lab"$1"_*.ipynb 2>/dev/null | head -n 1; }
+notebook_of() { ls "$HERE"/labs-student/lab"$1"_*/lab"$1"_*.ipynb 2>/dev/null | head -n 1; }
 
 # lab_reset N: put a fresh copy of the notebook of lab N in your folder (your old copy is kept as .old)
 lab_reset() {
@@ -74,7 +74,7 @@ lab_check() {
   if git -C "$HERE" status --short --ignored 2>/dev/null | grep -q '^!!'; then
     echo "Files made while running the labs (not part of the course):"
     git -C "$HERE" status --short --ignored | grep '^!!'
-    ask "Delete them?" && { git -C "$HERE" clean -fdX -q -- labs; echo "Deleted."; }
+    ask "Delete them?" && { git -C "$HERE" clean -fdX -q -- labs-student; echo "Deleted."; }
   fi
   title "2. Power mode"
   if command -v nvpmodel >/dev/null 2>&1; then

@@ -6,7 +6,7 @@ that student's JupyterLab on the port and with the PIN the teacher page shows, w
 teacher takes a student away, the agent stops that JupyterLab. Each student has their own Python environment in
 their folder (.venv), made by the agent the first time. Only the Python standard library is used.
 
-    python3 labs/agent.py            (the service does this)
+    python3 labs-student/agent.py            (the service does this)
 """
 import json
 import os
@@ -102,7 +102,7 @@ def make_venv(key, home):
             with open(os.path.join(site, "myduino_quiet.pth"), "w") as f:
                 f.write('import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")\n')
             with open(os.path.join(site, "myduino_labs.pth"), "w") as f:       # the notebooks import labview
-                f.write(os.path.join(HERE, "labs") + "\n")
+                f.write(os.path.join(HERE, "labs-student") + "\n")
             open(os.path.join(venv, ".ready"), "w").close()
             failed.pop(key, None)
             log("Python environment ready:", key.replace("__", "/"))
@@ -128,8 +128,8 @@ def prepare(home):
                     f"alias lab='bash {os.path.join(HERE, 'lab.sh')}'\ncd \"$HOME\" 2>/dev/null\n")
     with open(os.path.join(home, ".bash_profile"), "w") as f:
         f.write('[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n')
-    shutil.copyfile(os.path.join(HERE, "labs", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
-    labs = os.path.join(HERE, "labs")
+    shutil.copyfile(os.path.join(HERE, "labs-student", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
+    labs = os.path.join(HERE, "labs-student")
     for folder in sorted(os.listdir(labs)):
         m = re.match(r"lab(\d)_", folder)
         if not m or not os.path.isdir(os.path.join(labs, folder)):

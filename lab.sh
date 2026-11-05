@@ -9,7 +9,7 @@
 #     lab check      reset the board for the next class
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB="$1"
-source "$HERE/labs/lib.sh"
+source "$HERE/labs-student/lib.sh"
 
 case "$LAB" in
   me)           ensure_student && echo "You are $(basename "$LAB_HOME") in class $LAB_CLASS. Your folder: $LAB_HOME"; exit $? ;;

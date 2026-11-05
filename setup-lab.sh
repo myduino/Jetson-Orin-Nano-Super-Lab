@@ -40,7 +40,7 @@ Wants=network-online.target
 [Service]
 User=$(id -un)
 WorkingDirectory=$HERE
-ExecStart=/usr/bin/python3 $HERE/labs/agent.py
+ExecStart=/usr/bin/python3 $HERE/labs-student/agent.py
 Restart=always
 RestartSec=5
 
