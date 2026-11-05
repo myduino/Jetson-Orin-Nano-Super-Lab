@@ -15,10 +15,10 @@ The teacher puts each student on a Jetson and a camera, on the teacher page. The
 
 ## Setup (once)
 
-**1. On the teacher's PC (Windows or Mac):** no Python, no Git and no terminal. Copy the app from the folder `labs-teacher/` of this repository:
+**1. On the teacher's PC (Windows or Mac):** no Python, no Git and no terminal. Download the app from the [latest release](https://github.com/myduino/Jetson-Orin-Nano-Super-Lab/releases/latest):
 
-- Windows: `myduino-jetson-lab.exe` (double-click; no install). If Windows asks about the network, choose Allow. If SmartScreen warns, choose More info, then Run anyway.
-- Mac with Apple chip (M1 or newer): `myduino-jetson-lab-mac-arm64.dmg`. Intel Mac: `myduino-jetson-lab-mac-x64.dmg`. Open it and drag the app to Applications. The first time, right-click the app, choose Open, then Open again (the app is not signed).
+- Windows: [myduino-jetson-lab.exe](https://github.com/myduino/Jetson-Orin-Nano-Super-Lab/releases/latest/download/myduino-jetson-lab.exe) (double-click; no install). If Windows asks about the network, choose Allow. If SmartScreen warns, choose More info, then Run anyway.
+- Mac with Apple chip (M1 or newer): [myduino-jetson-lab-mac-arm64.dmg](https://github.com/myduino/Jetson-Orin-Nano-Super-Lab/releases/latest/download/myduino-jetson-lab-mac-arm64.dmg). Intel Mac: [myduino-jetson-lab-mac-x64.dmg](https://github.com/myduino/Jetson-Orin-Nano-Super-Lab/releases/latest/download/myduino-jetson-lab-mac-x64.dmg). Open it and drag the app to Applications. The first time, right-click the app, choose Open, then Open again (the app is not signed).
 
 **2. Add each Jetson in the portal (no terminal on the Jetson).** Open the app: the window is the teacher portal. Under **Jetsons**, type the Jetson's IP address, user name and password (find the IP on the Jetson with `hostname -I`) and click **Add**. Then click **SETUP**. The app connects over SSH, downloads the course folder (only the student part) to `~/Jetson-Orin-Nano-Super-Lab`, and runs `labs-setup.sh`, which installs JupyterLab and the lab agent (the agent starts by itself whenever the Jetson starts). The steps show live in the portal, and the Jetson turns **online** when it is done (a few minutes). The password is saved on the teacher PC so SETUP can be run again later (it updates the Jetson). The Jetson needs internet, the same network as the teacher PC, and SSH on (it is on by default).
 
@@ -66,7 +66,7 @@ Outside those two folders there are only two things, because Linux needs them: t
 ## Folders
 
 - `labs-student/`: the master notebooks of the labs (`labs-student/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
-- `labs-teacher/`: the teacher app (Windows `.exe`, Mac `.dmg`). Only the built programs are kept here.
+- `labs-teacher/`: where to download the teacher app (Windows `.exe`, Mac `.dmg`). The programs are in the GitHub Releases, not in the repository.
 - `labs-student/agent.py`: the lab agent (runs on each Jetson). `labs-setup.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
 - `labs-student/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs-student/lab0_demo/demo.py`: the Lab 0 AI vision game.
