@@ -4,12 +4,17 @@ open_camera()  opens the camera you chose with   lab start <name> camera <number
 Viewer         live picture for programs you run in the terminal:
                a window on the Jetson screen, or a page in your laptop browser when you work over SSH
 live()         live picture inside a notebook, with Stop and Save buttons
+sudo_login()   asks for your password once, so "sudo" works in notebook cells
 """
 import atexit
+import getpass
 import os
 import select
 import socket
+import stat
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from urllib.parse import unquote
@@ -206,6 +211,34 @@ class Viewer:
             self._cond.notify_all()
 
 
+# ---------------------------------------------------------------- sudo in notebooks
+def sudo_login():
+    """Ask for your password once (it is not shown and not saved in the notebook).
+
+    After this, a cell such as   !sudo apt update   works: a notebook has no terminal where sudo could ask.
+    The password lives only in this notebook's kernel. Restarting the kernel forgets it.
+    """
+    folder = tempfile.mkdtemp(prefix="labsudo_")
+    os.chmod(folder, stat.S_IRWXU)
+    ask = os.path.join(folder, "askpass")
+    shim = os.path.join(folder, "sudo")
+    with open(ask, "w") as f:
+        f.write('#!/bin/sh\nprintf "%s\\n" "$LAB_SUDO_PW"\n')
+    with open(shim, "w") as f:
+        f.write('#!/bin/sh\nexec /usr/bin/sudo -A "$@"\n')
+    os.chmod(ask, stat.S_IRWXU)
+    os.chmod(shim, stat.S_IRWXU)
+    os.environ["LAB_SUDO_PW"] = getpass.getpass("Password of the Jetson: ")
+    os.environ["SUDO_ASKPASS"] = ask
+    os.environ["PATH"] = folder + os.pathsep + os.environ["PATH"]
+    ok = subprocess.run(["sudo", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    if ok:
+        print("sudo is ready.")
+    else:
+        os.environ.pop("LAB_SUDO_PW", None)
+        print("That password was not accepted. Run this cell again.")
+
+
 # ---------------------------------------------------------------- notebooks
 class LiveView:
     """Live video inside a notebook.
@@ -214,12 +247,14 @@ class LiveView:
     state holds the values of your controls and "fps". controls is a dict:
         {"Mode": ["normal", "gray"]}          a drop-down list
         {"Confidence": (0.05, 0.95, 0.05, 0.4)}   a slider: (min, max, step, start)
+    actions is a dict of extra buttons: {"Start": function}. The function gets state when the button is pressed.
     """
     _active = None
 
-    def __init__(self, process, controls=None, width=640, size=(640, 480), mjpg=True):
+    def __init__(self, process, controls=None, width=640, size=(640, 480), mjpg=True, actions=None):
         self.process = process
         self.controls = controls or {}
+        self.actions = actions or {}
         self.width = width
         self.size = size
         self.mjpg = mjpg
@@ -242,6 +277,10 @@ class LiveView:
         stop.on_click(lambda _: self.stop())
         save.on_click(lambda _: self._save())
         boxes = [stop, save]
+        for label, func in self.actions.items():
+            b = widgets.Button(description=label, button_style="success")
+            b.on_click(lambda _, f=func: f(self.state))
+            boxes.append(b)
         for name, spec in self.controls.items():
             self.state[name] = spec[0] if isinstance(spec, list) else spec[3]
             if isinstance(spec, list):
