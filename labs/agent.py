@@ -146,6 +146,7 @@ def student_env(home, cls, camera_device):
     env.update(
         # HOME is the student folder, so everything the programs write (settings, caches, history, temporary files)
         # lands in the student's own folder and nothing is left anywhere else on the Jetson.
+        LD_LIBRARY_PATH=os.path.join(venv, "lib", "python3.10", "site-packages", "nvidia", "cu12", "lib") + os.pathsep + env.get("LD_LIBRARY_PATH", ""),
         HOME=home, TMPDIR=os.path.join(home, ".tmp"), PIP_CACHE_DIR=os.path.join(ROOT, ".cache", "pip"), LAB_ROOT=ROOT,
         VIRTUAL_ENV=venv, PATH=os.path.join(venv, "bin") + os.pathsep + env.get("PATH", ""),
         LAB_HOME=home, LAB_CLASS=cls, HISTFILE=os.path.join(home, ".bash_history"),
