@@ -405,12 +405,39 @@ class Server(ThreadingHTTPServer):
         self.server_name, self.server_port = "teacher", self.server_address[1]
 
 
+def demo():
+    """A preview with made-up Jetsons and students, so you can see the page. Password: demo. Nothing is saved."""
+    global DATA, STATE
+    import tempfile
+    DATA = tempfile.mkdtemp(prefix="myduino_demo_")
+    STATE = os.path.join(DATA, "state.json")
+    salt = secrets.token_bytes(16)
+    db.update(password=salt.hex() + " " + _hash("demo", salt), key="demo1234")
+    now = time.time()
+    cams = lambda n: [{"number": i, "device": f"/dev/video{2 * i}", "name": "USB 2.0 Camera"} for i in range(n)]
+    jetsons["jetson-01"] = dict(ip="192.168.0.234", seen=now, cameras=cams(3), running=[{"key": "a__amira"}, {"key": "a__ali"}], ready=True, note="")
+    jetsons["jetson-02"] = dict(ip="192.168.0.235", seen=now, cameras=cams(2), running=[{"key": "a__budi"}], ready=True, note="")
+    jetsons["jetson-03"] = dict(ip="192.168.0.236", seen=now - 300, cameras=cams(1), running=[], ready=True, note="")
+    students = {}
+    for name, jet, cam, port in (("amira", "jetson-01", 0, 8881), ("ali", "jetson-01", 1, 8882), ("budi", "jetson-02", 0, 8881),
+                                 ("siti", "jetson-03", 0, 8881), ("hafiz", "", None, 0), ("dina", "", None, 0)):
+        st = new_student("a", name)
+        st.update(jetson=jet, camera=cam, port=port, ports={jet: port} if jet else {}, homes=[jet] if jet else [])
+        students[name] = st
+    db["classes"] = {"a": {"students": students}, "b": {"students": {"farid": new_student("b", "farid")}}}
+
+
 def main():
-    load()
+    if "--demo" in sys.argv:
+        demo()
+    else:
+        load()
     if not db["key"]:
         db["key"] = secrets.token_hex(4)
         save()
-    if not db["password"]:
+    if "--demo" in sys.argv:
+        print("PREVIEW with made-up data. The password is: demo")
+    elif not db["password"]:
         if not sys.stdin.isatty():
             sys.exit("Run this in a terminal once, to choose the teacher password.")
         set_password()
@@ -418,7 +445,8 @@ def main():
         set_password()
     server = Server(("0.0.0.0", PORT), Handler)
     server.ip = my_ip()
-    threading.Thread(target=saver, daemon=True).start()
+    if "--demo" not in sys.argv:
+        threading.Thread(target=saver, daemon=True).start()
     print(f"\nTeacher page:   http://{server.ip}:{PORT}/    (on this PC also http://localhost:{PORT}/)")
     print(f"Class key:      {db['key']}")
     print(f"On each Jetson: bash setup-lab.sh {server.ip}:{PORT} {db['key']}")
@@ -427,8 +455,9 @@ def main():
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nStopped.")
-    with lock:
-        save()
+    if "--demo" not in sys.argv:
+        with lock:
+            save()
 
 
 if __name__ == "__main__":
