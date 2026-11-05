@@ -2,22 +2,37 @@ import os
 import time
 
 import cv2
-from labview import Viewer, open_camera
-import torch
-from ultralytics import YOLO
 
 # ---------------- Settings ----------------
-MODEL = "yolo26n_fp16.engine"   # fast model. Falls back to yolo26n.pt
+MODEL = "yolo26n_fp16.engine"   # fast model (made in Lab 8). Falls back to yolo26n.pt
 CHALLENGE_SECONDS = 60          # length of the game
-CONFIDENCE = 0.40               # how sure the model must be (+ and - change it)
-SCALE = 1.5                     # make the window bigger
+CONFIDENCE = 0.40               # how sure the model must be (the slider changes it)
 # ------------------------------------------
 
-device = 0 if torch.cuda.is_available() else "cpu"
-if not os.path.exists(MODEL):
-    print(f"{MODEL} not found, using yolo26n.pt (slower)")
-    MODEL = "yolo26n.pt"
-model = YOLO(MODEL, task="detect")
+model = None
+device = "cpu"
+
+
+def find_model():
+    """Your own engine from Lab 8 if you have one, else the plain model from your models folder."""
+    home = os.environ.get("LAB_HOME", "")
+    for path in (MODEL, os.path.join(home, "lab8", MODEL), os.path.join(home, "models", "yolo26n.pt"), "yolo26n.pt"):
+        if os.path.exists(path):
+            return path
+    return "yolo26n.pt"
+
+
+def load_model():
+    """Load the model once (the first call takes about 20 seconds)."""
+    global model, device
+    if model is None:
+        import torch
+        from ultralytics import YOLO
+        device = 0 if torch.cuda.is_available() else "cpu"
+        path = find_model()
+        print(f"Using model: {path}")
+        model = YOLO(path, task="detect")
+    return model
 
 
 class Game:
@@ -53,6 +68,7 @@ class Game:
 
 def see(frame, conf):
     """Run the model. Return the picture with boxes and the set of names."""
+    load_model()
     result = model(frame, conf=conf, device=device, verbose=False)[0]
     names = {result.names[int(c)] for c in result.boxes.cls}
     return result.plot(), names
@@ -76,14 +92,14 @@ def draw(img, game, fps, now, conf):
     if game.state == "ready":
         panel(img, [("MYDUINO AI VISION DEMO", yellow),
                     ("Show objects to the camera", white),
-                    ("SPACE = start the 60 second challenge", green),
-                    (f"+ / - = change the confidence ({conf:.2f})", white),
-                    ("Q = quit", white)], 10, 10, 520)
+                    ("Press Start to begin the 60 second challenge", green),
+                    (f"Confidence: {conf:.2f}  (slider)", white),
+                    ("Stop button = quit", white)], 10, 10, 520)
     elif game.state == "playing":
         panel(img, [("MYDUINO AI VISION DEMO", yellow),
                     (f"Time left: {game.time_left(now):4.0f} s", white),
                     (f"Kinds found: {len(game.found)}", green),
-                    (f"Confidence: {conf:.2f}  (+ / -)", white)], 10, 10, 380)
+                    (f"Confidence: {conf:.2f}", white)], 10, 10, 380)
         shown = game.found[-10:]
         lines = [(name, white) for name in shown]
         if lines:
@@ -94,52 +110,28 @@ def draw(img, game, fps, now, conf):
                  (f"You found {len(game.found)} kinds:", green)]
         lines += [(", ".join(game.found[i:i + 3]), white)
                   for i in range(0, min(len(game.found), 12), 3)]
-        lines += [("R = try again   Q = quit", yellow)]
+        lines += [("Press Start to try again", yellow)]
         panel(img, lines, 10, 10, min(w - 20, 620))
     cv2.putText(img, f"{fps:.0f} FPS", (w - 110, h - 12),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
 
-def main():
-    cap = open_camera()
-    view = Viewer()
-
+def notebook():
+    """The same game inside a notebook: Start and Restart buttons, a Confidence slider."""
+    from labview import live
+    load_model()
     game = Game(CHALLENGE_SECONDS)
-    conf = CONFIDENCE
-    fps, last = 0.0, time.perf_counter()
-    print("SPACE = start, R = restart, + / - = confidence, Q = quit")
 
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            print("No frame from the camera.")
-            break
-
-        shown, names = see(frame, conf)
+    def process(frame, state):
+        shown, names = see(frame, state["Confidence"])
         now = time.perf_counter()
+        if state.pop("go", False):
+            game.start(now)
         game.update(names, now)
-        fps = 0.9 * fps + 0.1 * (1.0 / (now - last))
-        last = now
+        draw(shown, game, state["fps"], now, state["Confidence"])
+        return shown
 
-        shown = cv2.resize(shown, None, fx=SCALE, fy=SCALE)
-        draw(shown, game, fps, now, conf)
-        view.show("Myduino AI Vision Demo", shown)
+    def start(state):
+        state["go"] = True
 
-        key = view.key()
-        if key == ord("q"):
-            break
-        if key in (ord("+"), ord("=")):
-            conf = min(0.95, conf + 0.05)
-        if key in (ord("-"), ord("_")):
-            conf = max(0.05, conf - 0.05)
-        if key == ord(" ") and game.state == "ready":
-            game.start(now)
-        if key == ord("r"):
-            game.start(now)
-
-    cap.release()
-    view.close()
-
-
-if __name__ == "__main__":
-    main()
+    return live(process, {"Confidence": (0.05, 0.95, 0.05, CONFIDENCE)}, actions={"Start / Restart": start}, width=800)
