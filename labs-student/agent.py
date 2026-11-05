@@ -36,6 +36,8 @@ running = {}          # key -> {"proc", "port", "pin", "camera", "started"}
 preparing = {}        # key -> time when the student's Python environment is being made
 failed = {}           # key -> (time, message) of the last failed attempt to make it
 deleted = []          # keys of folders deleted since the last report
+renamed = []          # "old>new" of class folders renamed since the last report
+rename_failed = {}    # "old>new" -> message, shown to the teacher until it works
 
 
 def log(*a):
@@ -214,6 +216,58 @@ def delete_folder(cls, student):
     deleted.append(key)
 
 
+def rename_class(old, new):
+    """The teacher renamed a class: move the class folder, then fix the paths inside the students' Python environments."""
+    if not (NAME.match(old) and NAME.match(new)) or old == new:
+        return
+    tag = f"{old}>{new}"
+    src, dst = os.path.join(ROOT, old), os.path.join(ROOT, new)
+    for key in [k for k in running if k.startswith(old + "__")]:
+        stop(key)
+    try:
+        if os.path.isdir(src):
+            if os.path.isdir(dst):
+                os.rmdir(dst)                                      # an empty folder of an old class of that name is fine; a full one raises
+            os.rename(src, dst)
+            for student in os.listdir(dst):
+                fix_paths(os.path.join(dst, student), os.path.join(src, student), os.path.join(dst, student))
+            log("renamed class", old, "to", new)
+        rename_failed.pop(tag, None)
+        renamed.append(tag)
+    except OSError as error:
+        if rename_failed.get(tag) != str(error):
+            log("cannot rename class", old, "to", new, ":", error)
+        rename_failed[tag] = str(error)
+
+
+def fix_paths(home, old_home, new_home):
+    """A Python environment has its own folder path inside its scripts. After a move, write the new path."""
+    venv = os.path.join(home, ".venv")
+    if not os.path.isdir(venv):
+        return
+    old_b, new_b = old_home.encode(), new_home.encode()
+    for folder, _, files in os.walk(os.path.join(venv, "bin")):
+        for name in files:
+            path = os.path.join(folder, name)
+            try:
+                if os.path.islink(path) or os.path.getsize(path) > 2_000_000:
+                    continue
+                with open(path, "rb") as f:
+                    data = f.read()
+                if old_b in data and b"\0" not in data[:512]:       # a script, not a program
+                    with open(path, "wb") as f:
+                        f.write(data.replace(old_b, new_b))
+            except OSError:
+                pass
+    cfg = os.path.join(venv, "pyvenv.cfg")
+    try:
+        text = open(cfg).read()
+        if old_home in text:
+            open(cfg, "w").write(text.replace(old_home, new_home))
+    except OSError:
+        pass
+
+
 def reconcile(plan):
     wanted = {}
     for p in plan:
@@ -247,14 +301,15 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "deleted": list(deleted), "preparing": list(preparing), "ready": True,
-        "note": next(iter(m for _, m in failed.values()), ""),
+        "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
+        "note": next(iter(m for _, m in failed.values()), "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json", "X-Key": cfg["key"]})
     with urllib.request.urlopen(req, timeout=6) as r:
         answer = json.load(r)
     del deleted[:]
+    del renamed[:]
     return answer
 
 
@@ -272,6 +327,8 @@ def main():
             try:
                 answer = hello(cfg)
                 last_ok = time.time()
+                for r in answer.get("rename", []):
+                    rename_class(str(r.get("from", "")), str(r.get("to", "")))
                 for d in answer.get("delete", []):
                     delete_folder(str(d.get("class", "")), str(d.get("student", "")))
                 reconcile(answer.get("plan", []))
