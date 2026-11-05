@@ -4,6 +4,7 @@ open_camera()  opens the camera you chose with   lab start <name> camera <number
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
+setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets the next one in)
 """
 import getpass
 import os
@@ -68,12 +69,17 @@ def sudo_login():
         print("That password was not accepted. Run this cell again.")
 
 
-# ---------------------------------------------------------------- one build at a time
-class build_lock:
-    """with build_lock():  ...   Building a TensorRT engine uses most of the memory, so students take turns."""
-    path = os.path.expanduser("~/.lab_build.lock")
+# ---------------------------------------------------------------- taking turns
+class _Lock:
+    """A lock shared by all students of this Jetson. A folder is the lock; its owner file says who has it."""
+    path = ""
+    waiting = ""
+
+    def _pid(self):
+        return os.getpid()
 
     def __enter__(self):
+        me = f"{os.path.basename(os.environ.get('LAB_HOME', 'student'))} {self._pid()}"
         shown = False
         while True:
             try:
@@ -82,22 +88,57 @@ class build_lock:
             except FileExistsError:
                 try:
                     owner = open(os.path.join(self.path, "owner")).read().split()
-                    pid = int(owner[-1])
-                    os.kill(pid, 0)                       # still alive?
+                    if " ".join(owner) == me:
+                        return self                           # this student already holds it
+                    os.kill(int(owner[-1]), 0)                # still alive?
                 except (OSError, ValueError, IndexError):
                     shutil.rmtree(self.path, ignore_errors=True)   # left behind by a closed session
                     continue
                 if not shown:
-                    print(f"{owner[0]} is building an engine now. Only one build at a time fits in the 8 GB memory, "
-                          "so you wait here.", flush=True)
+                    print(f"{owner[0]} is {self.waiting} now. {self.reason} so you wait here.", flush=True)
                     shown = True
                 time.sleep(10)
         with open(os.path.join(self.path, "owner"), "w") as f:
-            f.write(f"{os.path.basename(os.environ.get('LAB_HOME', 'student'))} {os.getpid()}\n")
+            f.write(me + "\n")
         return self
 
     def __exit__(self, *exc):
         shutil.rmtree(self.path, ignore_errors=True)
+
+
+class build_lock(_Lock):
+    """with build_lock():  ...   Building a TensorRT engine uses most of the memory, so students take turns."""
+    path = os.path.expanduser("~/.lab_build.lock")
+    waiting = "building an engine"
+    reason = "Only one build at a time fits in the 8 GB memory,"
+
+
+_setup = None
+
+
+def setup_begin():
+    """Lab 0, Part 0: one student installs the course packages at a time (two installs would break each other)."""
+    global _setup
+
+    class setup_lock(_Lock):
+        path = os.path.expanduser("~/.lab_setup.lock")
+        waiting = "installing the course packages"
+        reason = "Two installs at the same time would break each other,"
+
+        def _pid(self):
+            return os.getppid()          # the JupyterLab server, so a kernel restart keeps the lock
+
+    _setup = setup_lock().__enter__()
+    return True
+
+
+def setup_end():
+    """Let the next student install (safe to run when you do not hold the lock)."""
+    global _setup
+    if _setup is not None:
+        _setup.__exit__()
+        _setup = None
+    print("Setup lock released.")
 
 
 # ---------------------------------------------------------------- notebooks
