@@ -1,52 +1,16 @@
 #!/bin/bash
-# Helper functions for the lab scripts (lab.sh loads this file). Do not run it on its own.
+# Helper functions of the lab command (lab.sh loads this file). Do not run it on its own.
 
 CT=$'\033[1;36m'   # headings
-CC=$'\033[1;33m'   # the command that is being run
 CN=$'\033[0m'
 
 title() { printf '\n%s== %s ==%s\n' "$CT" "$*" "$CN"; }
 say()   { printf '%s%s%s\n' "$CT" "$*" "$CN"; }
 
-# run: show the command, then run it, so you see exactly what was typed for you.
-run() {
-  local show="$*" tilde='~'
-  printf '%s$ %s%s\n' "$CC" "${show//"$HOME"/$tilde}" "$CN"
-  eval "$*"
-  case "$1" in cd|cd\ *) printf '   (you are now in %s)\n' "$PWD" ;; esac
-}
-
-# pause: wait for Enter between steps.
-pause() {
-  if [ -t 0 ]; then read -r -p $'\nPress Enter to go on... ' _; fi
-}
-
-# show_parts: list the parts of the lab that is loaded (each lab script sets LAB_TITLE and PARTS).
-show_parts() {
-  printf '\n%sLab %s: %s%s\n' "$CT" "$LABNUM" "$LAB_TITLE" "$CN"
-  echo "Type  lab $LABNUM <part>  to run a part, for example:  lab $LABNUM ${PARTS[0]%%|*}"
-  echo
-  for p in "${PARTS[@]}"; do
-    printf '  lab %s %s   %s\n' "$LABNUM" "${p%%|*}" "${p#*|}"
-  done
-  echo
-}
-
-# countdown N "message": waits N seconds and shows the time left on one line
-countdown() {
-  local n=$1 msg=$2
-  while [ "$n" -gt 0 ]; do
-    printf "\r  %s %2d s " "$msg" "$n"
-    sleep 1
-    n=$((n-1))
-  done
-  printf "\r  %s done.      \n" "$msg"
-}
-
 # ---- Students: everybody has their own folder ----
 # ~/students/<name>/lab1 ... lab9   the work of one student (notebooks, pictures, engines)
 # ~/students/_shared/               the model files, for everybody
-# LAB_HOME is the folder of the student who is working in THIS terminal. The lab scripts use it, so
+# LAB_HOME is the folder of the student who is working in THIS terminal. The notebooks use it, so
 # two students on one Jetson never write into each other's folder.
 STUDENTS="$HOME/students"
 SHARED="$STUDENTS/_shared"
@@ -280,7 +244,7 @@ lab_start() {
   fi
   if [ -n "$name" ]; then choose_student "$name" || return 1; else ensure_student || return 1; fi
   if [ ! -f ~/venvs/jetson/bin/activate ]; then
-    echo "The course environment is missing. Run  bash $HERE/setup.sh  first."; return 1
+    echo "The course environment is missing. Run  bash $HERE/bootstrap.sh  first."; return 1
   fi
   SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""; SESSION_STREAM=""
   mkdir -p "$SHARE_DIR"; session_busy "$SESSION_NAME" && return 1
