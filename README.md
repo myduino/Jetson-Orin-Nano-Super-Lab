@@ -20,22 +20,11 @@ The teacher puts each student on a Jetson and a camera, on the teacher page. The
 - Windows: `myduino-jetson-lab.exe` (double-click; no install). If Windows asks about the network, choose Allow. If SmartScreen warns, choose More info, then Run anyway.
 - Mac with Apple chip (M1 or newer): `myduino-jetson-lab-mac-arm64.dmg`. Intel Mac: `myduino-jetson-lab-mac-x64.dmg`. Open it and drag the app to Applications. The first time, right-click the app, choose Open, then Open again (the app is not signed).
 
-The app window shows the **class key**. Use it in step 2.
+**2. Add each Jetson in the portal (no terminal on the Jetson).** Open the app and click **START LAB**: the teacher portal opens. Under **Jetsons**, type the Jetson's IP address, user name and password (find the IP on the Jetson with `hostname -I`) and click **Add**. Then click **SETUP**. The app connects over SSH, downloads the course folder (only the student part) to `~/Jetson-Orin-Nano-Super-Lab`, and runs `labs-setup.sh`, which installs JupyterLab and the lab agent (the agent starts by itself whenever the Jetson starts). The steps show live in the portal, and the Jetson turns **online** when it is done (a few minutes). The password is saved on the teacher PC so SETUP can be run again later (it updates the Jetson). The Jetson needs internet, the same network as the teacher PC, and SSH on (it is on by default).
 
-**2. On each Jetson** (open a terminal, once):
-
-```bash
-cd ~
-git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
-cd Jetson-Orin-Nano-Super-Lab
-bash labs-setup.sh <address of the teacher page> <class key>
-```
-
-The teacher page prints this exact line. `labs-setup.sh` installs JupyterLab and the lab agent, and the agent starts by itself whenever the Jetson starts. Refresh the teacher page: the Jetson appears in the list.
+By hand instead, on the Jetson: `git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git ~/Jetson-Orin-Nano-Super-Lab && bash ~/Jetson-Orin-Nano-Super-Lab/labs-setup.sh <teacher PC address:8800> <class key> jetson_01` (the app window shows the class key).
 
 **3. Each student sets up their own environment:** when a student first starts, the agent makes their own Python environment (`.venv` in their folder, 2 to 3 minutes; the teacher page shows "preparing"). Then the student runs the **Lab 0 notebook**: **Part 0** installs the system programs once for the whole Jetson (the first student does it, the others skip it), and **Part 0b** installs CuPy, PyTorch, Ultralytics and the AI models into **the student's own environment** (about 10 minutes and 1.5 GB each, with the steps visible). Students can do Part 0b at the same time.
-
-No `git`? On GitHub press **Code, then Download ZIP** and extract it.
 
 ## Every class
 
