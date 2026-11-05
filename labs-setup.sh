@@ -1,9 +1,9 @@
 #!/bin/bash
 # Run ONCE on each Jetson after cloning this folder:
-#     bash setup-lab.sh <teacher address:port> <class key> [name of this Jetson]
+#     bash labs-setup.sh <teacher address:port> <class key> [name of this Jetson]
 # Give each Jetson a different name (for example jetson-01). Without one the name is made from the host name and a short
 # code of this Jetson, because Jetsons flashed from the same image have the same host name.
-# The teacher page prints the exact line (for example:  bash setup-lab.sh 192.168.0.10:8800 1a2b3c4d).
+# The teacher page prints the exact line (for example:  bash labs-setup.sh 192.168.0.10:8800 1a2b3c4d).
 # Needs internet. Safe to run again. It installs the lab agent. The agent starts by itself whenever the Jetson starts and
 # reports to the teacher page. When the teacher puts a student on this Jetson, the agent makes that student's own Python
 # environment (JupyterLab, 2 to 3 minutes) in the student's folder and starts their JupyterLab.

@@ -28,10 +28,10 @@ The app window shows the **class key**. Use it in step 2.
 cd ~
 git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
 cd Jetson-Orin-Nano-Super-Lab
-bash setup-lab.sh <address of the teacher page> <class key>
+bash labs-setup.sh <address of the teacher page> <class key>
 ```
 
-The teacher page prints this exact line. `setup-lab.sh` installs JupyterLab and the lab agent, and the agent starts by itself whenever the Jetson starts. Refresh the teacher page: the Jetson appears in the list.
+The teacher page prints this exact line. `labs-setup.sh` installs JupyterLab and the lab agent, and the agent starts by itself whenever the Jetson starts. Refresh the teacher page: the Jetson appears in the list.
 
 **3. Each student sets up their own environment:** when a student first starts, the agent makes their own Python environment (`.venv` in their folder, 2 to 3 minutes; the teacher page shows "preparing"). Then the student runs the **Lab 0 notebook**: **Part 0** installs the system programs once for the whole Jetson (the first student does it, the others skip it), and **Part 0b** installs CuPy, PyTorch, Ultralytics and the AI models into **the student's own environment** (about 10 minutes and 1.5 GB each, with the steps visible). Students can do Part 0b at the same time.
 
@@ -77,7 +77,7 @@ Outside those two folders there are only two things, because Linux needs them: t
 
 - `labs-student/`: the master notebooks of the labs (`labs-student/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
 - `labs-teacher/`: the teacher app (Windows `.exe`, Mac `.dmg`). Only the built programs are kept here.
-- `labs-student/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
+- `labs-student/agent.py`: the lab agent (runs on each Jetson). `labs-setup.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
 - `labs-student/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs-student/lab0_demo/demo.py`: the Lab 0 AI vision game.
 - `labs-student/verify_setup.py`: the check used by Lab 0.
@@ -93,7 +93,7 @@ Outside those two folders there are only two things, because Linux needs them: t
 
 ## Starting Again
 
-If you break something on a Jetson, delete the course folder and clone it again, then run `setup-lab.sh` again. The student folders (with their environments) are in `~/myduino-jetson-lab` and are not touched.
+If you break something on a Jetson, delete the course folder and clone it again, then run `labs-setup.sh` again. The student folders (with their environments) are in `~/myduino-jetson-lab` and are not touched.
 
 ## Status
 

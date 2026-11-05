@@ -1,4 +1,4 @@
-"""The Jetson agent of the Myduino lab. It runs on every Jetson as a service (setup-lab.sh installs it).
+"""The Jetson agent of the Myduino lab. It runs on every Jetson as a service (labs-setup.sh installs it).
 
 Every few seconds it tells the teacher server which Jetson this is, its IP address and its cameras, and asks which
 students should work here. For each student it makes the folder ~/myduino-jetson-lab/<class>/<student> and starts
@@ -262,7 +262,7 @@ def main():
     try:
         cfg = json.load(open(CONFIG))
     except (OSError, ValueError):
-        sys.exit(f"No settings in {CONFIG}. Run setup-lab.sh <teacher address> <class key>.")
+        sys.exit(f"No settings in {CONFIG}. Run labs-setup.sh <teacher address> <class key>.")
     signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))
     log("agent started; teacher", cfg["teacher"])
     shown = ""
