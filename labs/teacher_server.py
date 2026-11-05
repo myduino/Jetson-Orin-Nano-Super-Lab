@@ -145,8 +145,9 @@ def view(ip):
             j = jetsons.get(s.get("jetson", ""), {})
             key = f"{cn}__{sn}"
             running = key in {r["key"] for r in j.get("running", [])}
+            preparing = key in j.get("preparing", [])
             rows.append({"name": sn, "jetson": s.get("jetson", ""), "camera": s.get("camera"), "pin": s["pin"], "port": s.get("port") or "",
-                         "address": f"{j['ip']}:{s['port']}" if s.get("jetson") and j.get("ip") else "", "state": ("running" if running else ("starting" if s.get("jetson") and online(j) else ("offline" if s.get("jetson") else ""))),
+                         "address": f"{j['ip']}:{s['port']}" if s.get("jetson") and j.get("ip") else "", "state": ("running" if running else ("preparing" if preparing else ("starting" if s.get("jetson") and online(j) else ("offline" if s.get("jetson") else "")))),
                          "homes": s.get("homes", [])})
         classes.append({"name": cn, "students": rows})
     out = []
@@ -171,7 +172,7 @@ def agent_hello(body):
         return {"error": "no id"}
     j = jetsons.setdefault(jid, {})
     j.update(ip=str(body.get("ip", "")), seen=time.time(), cameras=body.get("cameras", [])[:6], running=body.get("running", [])[:40],
-             ready=bool(body.get("ready", True)), note=str(body.get("note", ""))[:200])
+             ready=bool(body.get("ready", True)), note=str(body.get("note", ""))[:200], preparing=body.get("preparing", [])[:40])
     for gone in body.get("deleted", []):                                   # the agent deleted these folders
         db["pending_delete"] = [d for d in db["pending_delete"] if not (d["jetson"] == jid and f"{d['class']}__{d['student']}" == gone)]
     save_soon()
@@ -279,7 +280,7 @@ function render(s){
       if (jet) jet.cameras.forEach(k => { if (!k.user || k.user === c.name + '/' + st.name) csel.append(el('option', {value:String(k.number), textContent:k.number + ': ' + k.name, selected: k.number === st.camera})); });
       csel.disabled = !st.jetson;
       const addr = st.address ? el('span', {}, el('span', {className:'addr', textContent:st.address}), ' ', el('button', {textContent:'Copy', onclick:() => copy(st.address)})) : '';
-      const state = el('span', {className: st.state === 'running' ? 'on' : 'off', textContent: st.state || '-'});
+      const state = el('span', {className: st.state === 'running' ? 'on' : (st.state === 'preparing' ? 'warn' : 'off'), textContent: st.state || '-'});
       const acts = el('span', {}, el('button', {textContent:'New PIN', onclick:() => act('/api/pin', {class:c.name, student:st.name})}), ' ', el('button', {textContent:'Remove', onclick:() => remove(c.name, st.name)}));
       t.append(row([st.name, jsel, csel, addr, el('span', {className:'addr', textContent:st.pin}), state, acts]));
     });

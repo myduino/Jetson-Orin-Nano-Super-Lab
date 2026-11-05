@@ -3,7 +3,8 @@
 Every few seconds it tells the teacher server which Jetson this is, its IP address and its cameras, and asks which
 students should work here. For each student it makes the folder ~/myduino-jetson-lab/<class>/<student> and starts
 that student's JupyterLab on the port and with the PIN the teacher page shows, with the chosen camera. When the
-teacher takes a student away, the agent stops that JupyterLab. Only the Python standard library is used.
+teacher takes a student away, the agent stops that JupyterLab. Each student has their own Python environment in
+their folder (.venv), made by the agent the first time. Only the Python standard library is used.
 
     python3 labs/agent.py            (the service does this)
 """
@@ -15,6 +16,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -23,13 +25,14 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))       # the c
 HOME = os.path.expanduser("~")
 CONFIG = os.path.join(HOME, ".lab_agent.json")
 ROOT = os.path.join(HOME, "myduino-jetson-lab")
-VENV = os.path.join(HOME, "venvs", "jetson")
 SYSFS = os.environ.get("LAB_SYSFS", "/sys/class/video4linux")
 DEV = os.environ.get("LAB_DEV", "/dev")
 NAME = re.compile(r"^[a-z0-9_]{1,20}$")
 EVERY = 5                                                               # seconds between two reports
 
 running = {}          # key -> {"proc", "port", "pin", "camera", "started"}
+preparing = {}        # key -> time when the student's Python environment is being made
+failed = {}           # key -> (time, message) of the last failed attempt to make it
 deleted = []          # keys of folders deleted since the last report
 
 
@@ -69,8 +72,43 @@ def my_ip(teacher_host):
         s.close()
 
 
-def jupyter_path():
-    return os.path.join(VENV, "bin", "jupyter")
+def venv_of(home):
+    return os.path.join(home, ".venv")
+
+
+def venv_ready(home):
+    return os.path.exists(os.path.join(venv_of(home), ".ready"))
+
+
+def make_venv(key, home):
+    """Make the student's own Python environment (about 2 to 3 minutes). Runs in a thread, so other students are not held up."""
+    venv = venv_of(home)
+    os.makedirs(os.path.join(home, ".jupyter"), exist_ok=True)
+    with open(os.path.join(home, ".jupyter", "prepare.log"), "ab") as out:
+        def run(*cmd):
+            subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, check=True)
+        try:
+            log("making the Python environment of", key.replace("__", "/"))
+            shutil.rmtree(venv, ignore_errors=True)
+            run("/usr/bin/python3", "-m", "venv", "--system-site-packages", venv)
+            run(os.path.join(venv, "bin", "pip"), "install", "--upgrade", "pip")
+            run(os.path.join(venv, "bin", "pip"), "install", "numpy<2", "jupyterlab", "ipywidgets", "openpyxl")
+            site = subprocess.run([os.path.join(venv, "bin", "python"), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+                                  capture_output=True, text=True, check=True).stdout.strip()
+            # OpenCV on the Jetson makes NumPy print a harmless warning: hide only that one message.
+            with open(os.path.join(site, "myduino_quiet.pth"), "w") as f:
+                f.write('import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")\n')
+            with open(os.path.join(site, "myduino_labs.pth"), "w") as f:       # the notebooks import labview
+                f.write(os.path.join(HERE, "labs") + "\n")
+            open(os.path.join(venv, ".ready"), "w").close()
+            failed.pop(key, None)
+            log("Python environment ready:", key.replace("__", "/"))
+        except (subprocess.CalledProcessError, OSError) as error:
+            shutil.rmtree(venv, ignore_errors=True)
+            failed[key] = (time.time(), f"Could not make the Python environment ({error}). See .jupyter/prepare.log in the student folder.")
+            log("failed:", key, error)
+        finally:
+            preparing.pop(key, None)
 
 
 # ---------------------------------------------------------------- a student's folder and JupyterLab
@@ -94,8 +132,9 @@ def prepare(home):
 
 def student_env(home, cls, camera_device):
     env = dict(os.environ)
+    venv = venv_of(home)
     env.update(
-        VIRTUAL_ENV=VENV, PATH=os.path.join(VENV, "bin") + os.pathsep + env.get("PATH", ""),
+        VIRTUAL_ENV=venv, PATH=os.path.join(venv, "bin") + os.pathsep + env.get("PATH", ""),
         LAB_HOME=home, LAB_CLASS=cls, HISTFILE=os.path.join(home, ".bash_history"),
         JUPYTER_CONFIG_DIR=os.path.join(home, ".jupyter", "config"), JUPYTER_DATA_DIR=os.path.join(home, ".jupyter", "data"),
         JUPYTER_RUNTIME_DIR=os.path.join(home, ".jupyter", "runtime"), JUPYTERLAB_SETTINGS_DIR=os.path.join(home, ".jupyter", "settings"),
@@ -119,7 +158,7 @@ def start(cls, student, port, pin, camera):
     log("start", f"{cls}/{student}", "port", port, "camera", camera if camera is not None else "-")
     out = open(os.path.join(home, ".jupyter", "server.log"), "ab")
     proc = subprocess.Popen(
-        [jupyter_path(), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
+        [os.path.join(venv_of(home), "bin", "jupyter"), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
          f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", "Start_Here.ipynb"],
         cwd=home, env=student_env(home, cls, device), stdout=out, stderr=out, start_new_session=True)
     running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time()}
@@ -145,6 +184,7 @@ def delete_folder(cls, student):
         return
     key = f"{cls}__{student}"
     stop(key)
+    failed.pop(key, None)
     target = os.path.realpath(os.path.join(ROOT, cls, student))
     if os.path.dirname(os.path.dirname(target)) == os.path.realpath(ROOT) and os.path.isdir(target):
         shutil.rmtree(target, ignore_errors=True)
@@ -166,6 +206,12 @@ def reconcile(plan):
             if gone and time.time() - r["started"] < 15:
                 wanted[key]["_wait"] = True                                  # it stops at once: do not restart in a loop
     for key, w in wanted.items():
+        home = os.path.join(ROOT, w["class"], w["student"])
+        if key not in running and not venv_ready(home):            # the student's own Python environment first
+            if key not in preparing and time.time() - failed.get(key, (0, ""))[0] > 60:
+                preparing[key] = time.time()
+                threading.Thread(target=make_venv, args=(key, home), daemon=True).start()
+            continue
         if key not in running and not w.get("_wait"):
             try:
                 start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"))
@@ -179,8 +225,8 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "deleted": list(deleted), "ready": os.path.exists(jupyter_path()),
-        "note": "" if os.path.exists(jupyter_path()) else "JupyterLab is missing. Run setup-lab.sh again.",
+        "deleted": list(deleted), "preparing": list(preparing), "ready": True,
+        "note": next(iter(m for _, m in failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json", "X-Key": cfg["key"]})

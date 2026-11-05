@@ -117,7 +117,7 @@ _setup = None
 
 
 def setup_begin():
-    """Lab 0, Part 0: one student installs the course packages at a time (two installs would break each other)."""
+    """Lab 0, Part 0: one student at a time installs the system programs (two apt installs would block each other)."""
     global _setup
 
     class setup_lock(_Lock):

@@ -36,7 +36,7 @@ bash setup-lab.sh <address of the teacher page> <class key>
 
 The teacher page prints this exact line. `setup-lab.sh` installs JupyterLab and the lab agent, and the agent starts by itself whenever the Jetson starts. Refresh the teacher page: the Jetson appears in the list.
 
-**3. Install the AI software, once for each Jetson:** put one student (or yourself) on the Jetson and run **Part 0 of the Lab 0 notebook**. It installs CuPy, PyTorch and Ultralytics with visible steps, and takes 20 to 40 minutes. Then every student runs Part 0b, which downloads their own AI models (about 60 MB).
+**3. Each student sets up their own environment:** when a student first starts, the agent makes their own Python environment (`.venv` in their folder, 2 to 3 minutes; the teacher page shows "preparing"). Then the student runs the **Lab 0 notebook**: **Part 0** installs the system programs once for the whole Jetson (the first student does it, the others skip it), and **Part 0b** installs CuPy, PyTorch, Ultralytics and the AI models into **the student's own environment** (about 10 minutes and 1.5 GB each, with the steps visible). Students can do Part 0b at the same time.
 
 No `git`? On GitHub press **Code, then Download ZIP** and extract it.
 
@@ -51,7 +51,7 @@ The teacher page shows: every Jetson (online or not, IP address, cameras and who
 
 ## The student folder is the environment
 
-`~/myduino-jetson-lab/<class>/<student>/` on the Jetson holds the notebooks, pictures, engines, the AI models, and the Jupyter, IPython and shell settings of one student. Only the Python packages (`~/venvs/jetson`) are shared, because PyTorch is several GB. Each student has their own port (8881, 8882, ...), which stays the same. Students share one Linux account, so a student could delete another's folder by hand: this is a classroom, not a secure system.
+`~/myduino-jetson-lab/<class>/<student>/` on the Jetson holds everything of one student: the notebooks, pictures, engines, the AI models, the Python environment (`.venv`, about 2 GB with PyTorch), and the Jupyter, IPython and shell settings. A student who installs or breaks a package only affects their own environment. Removing a student on the teacher page deletes all of it. Each student has their own port (8881, 8882, ...), which stays the same. Students share one Linux account, so a student could delete another's folder by hand: this is a classroom, not a secure system. Only the system programs installed by Part 0 of Lab 0 (OpenCV, camera tools, jtop) are shared.
 
 ## Course Flow
 
@@ -72,7 +72,7 @@ The teacher page shows: every Jetson (online or not, IP address, cameras and who
 
 - `labs/`: the master notebooks of the labs (`labs/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
 - `labs/teacher_server.py`: the teacher page (runs on the teacher PC). `setup-teacher.ps1` and `setup-teacher.sh` start it.
-- `labs/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`).
+- `labs/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
 - `labs/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs/lab0_demo/demo.py`: the Lab 0 AI vision game.
 - `lab.sh`, `labs/lib.sh`: the small `lab` command (`lab me`, `lab reset 4` in a JupyterLab Terminal tab; `lab cameras` and `lab check` for the teacher).
@@ -90,7 +90,7 @@ The teacher page shows: every Jetson (online or not, IP address, cameras and who
 
 ## Starting Again
 
-If you break something on a Jetson, delete the course folder and clone it again, then run `setup-lab.sh` again. The student folders are in `~/myduino-jetson-lab` and are not touched.
+If you break something on a Jetson, delete the course folder and clone it again, then run `setup-lab.sh` again. The student folders (with their environments) are in `~/myduino-jetson-lab` and are not touched.
 
 ## Status
 
