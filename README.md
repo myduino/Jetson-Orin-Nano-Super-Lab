@@ -80,8 +80,7 @@ Outside those two folders there are only two things, because Linux needs them: t
 - `labs-student/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`). It makes each student's folder and Python environment and starts their JupyterLab.
 - `labs-student/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs-student/lab0_demo/demo.py`: the Lab 0 AI vision game.
-- `lab.sh`, `labs-student/lib.sh`: the small `lab` command (`lab me` and `lab reset 4` in a JupyterLab Terminal tab, where `lab` is ready; for the teacher: `bash lab.sh cameras` and `bash lab.sh check` in this folder).
-- `verify_setup.py`: the check used by Lab 0.
+- `labs-student/verify_setup.py`: the check used by Lab 0.
 
 ## Notes for the teacher
 
@@ -91,7 +90,6 @@ Outside those two folders there are only two things, because Linux needs them: t
 - Each student builds their own TensorRT engines in Lab 8. Only one build runs at a time, because a build uses most of the 8 GB memory. The next student waits.
 - `sudo` in a notebook: the student types the password once in a hidden box (`labview.sudo_login()`). It stays in that notebook's memory only.
 - Anyone who has a student's address and PIN can run commands on that Jetson, and the teacher portal opens only on the teacher PC itself. Use a classroom network. Student pages use plain HTTP.
-- `lab check` on a Jetson shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history and lists the student folders.
 
 ## Starting Again
 

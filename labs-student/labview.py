@@ -261,3 +261,20 @@ class LiveView:
 def live(process, controls=None, **options):
     """Start a live view in the notebook and return it (call .stop() or press the Stop button)."""
     return LiveView(process, controls, **options).start()
+
+
+def reset(number):
+    """Put a fresh copy of the notebook of lab <number> in your folder. Your old copy is kept next to it as .old."""
+    import glob
+    home = os.environ.get("LAB_HOME") or os.getcwd()
+    found = glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), f"lab{number}_*", f"lab{number}_*.ipynb"))
+    if not found:
+        print(f"There is no lab {number}.")
+        return
+    dest = os.path.join(home, f"lab{number}", os.path.basename(found[0]))
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if os.path.exists(dest):
+        os.replace(dest, dest + ".old")
+        print("Your old copy was kept as", dest + ".old")
+    shutil.copyfile(found[0], dest)
+    print("Fresh notebook:", dest)

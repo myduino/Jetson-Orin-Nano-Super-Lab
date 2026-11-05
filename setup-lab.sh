@@ -28,7 +28,10 @@ sed -i '/^alias lab=/d;/^alias jet=/d' ~/.bashrc 2>/dev/null
 rm -f ~/.lab_agent.json
 mkdir -p ~/myduino-jetson-lab
 
-echo "== 3. The lab agent =="
+echo "== 3. Power mode =="
+command -v nvpmodel > /dev/null && sudo nvpmodel -m 2 && echo "Power mode: MAXN SUPER"
+
+echo "== 4. The lab agent =="
 printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/myduino-jetson-lab/.agent.json
 chmod 600 ~/myduino-jetson-lab/.agent.json
 sudo tee /etc/systemd/system/myduino-lab-agent.service > /dev/null <<UNIT
@@ -61,4 +64,3 @@ fi
 echo
 echo "Setup finished. Next: the teacher puts a student on this Jetson, and the student opens the address from the teacher page."
 echo "Each student then runs Lab 0: Part 0 (system programs, once for this Jetson) and Part 0b (their own AI packages and models)."
-echo "For the teacher commands type:  bash $HERE/lab.sh check   (or cameras)."

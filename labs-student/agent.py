@@ -126,7 +126,10 @@ def prepare(home):
     if "# myduino-lab" not in read(rc):
         with open(rc, "a") as f:
             f.write('# myduino-lab\n[ -f "$HOME/.venv/bin/activate" ] && source "$HOME/.venv/bin/activate"\n'
-                    f"alias lab='bash {os.path.join(HERE, 'lab.sh')}'\ncd \"$HOME\" 2>/dev/null\n")
+                    'cd "$HOME" 2>/dev/null\n')
+    if "alias lab=" in read(rc):                                   # the old lab command is gone
+        with open(rc, "w") as f:
+            f.write("".join(l for l in read(rc).splitlines(True) if not l.startswith("alias lab=")))
     with open(os.path.join(home, ".bash_profile"), "w") as f:
         f.write('[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n')
     for pth in glob.glob(os.path.join(home, ".venv", "lib", "python*", "site-packages", "myduino_labs.pth")):   # keep the path right if the course folder moves
