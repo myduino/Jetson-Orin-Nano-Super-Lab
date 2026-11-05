@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run ONCE after cloning this folder:   bash setup.sh
+# All-in-one setup from the terminal:   bash setup.sh
+# The students normally do this in the Lab 0 notebook (after bootstrap.sh). This script does the same steps for a teacher.
 # Needs internet. Safe to run again.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -16,7 +17,7 @@ echo "== 2. Python environment =="
 mkdir -p ~/venvs
 [ -d ~/venvs/jetson ] || python3 -m venv --system-site-packages ~/venvs/jetson
 grep -q "alias jet=" ~/.bashrc || echo "alias jet='source ~/venvs/jetson/bin/activate'" >> ~/.bashrc
-# "lab 2 C" runs the commands of Lab 2, Part C for you (see lab.sh). Open a new terminal after setup.
+# "lab start yourname" opens your JupyterLab (see lab.sh). Open a new terminal after setup.
 sed -i '/^alias lab=/d' ~/.bashrc
 echo "alias lab='bash \"$HERE/lab.sh\"'" >> ~/.bashrc
 source ~/venvs/jetson/bin/activate
@@ -115,4 +116,4 @@ fi
 echo "== 7. Check =="
 python "$HERE/verify_setup.py"
 echo
-echo "Setup finished. Start the demo with:   bash run_demo.sh"
+echo "Setup finished. Open a NEW terminal, type  lab start yourname camera 0  and open Lab 0, Part A."
