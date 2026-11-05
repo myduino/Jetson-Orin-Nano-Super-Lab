@@ -26,6 +26,8 @@ def load_model():
     """Load the model once (the first call takes about 20 seconds)."""
     global model, device
     if model is None:
+        import labview
+        labview.cuda_libs()               # PyTorch needs a library that Lab 0 Step 8 installed
         import torch
         from ultralytics import YOLO
         device = 0 if torch.cuda.is_available() else "cpu"

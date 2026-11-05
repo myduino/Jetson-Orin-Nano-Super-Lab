@@ -278,3 +278,21 @@ def reset(number):
         print("Your old copy was kept as", dest + ".old")
     shutil.copyfile(found[0], dest)
     print("Fresh notebook:", dest)
+
+
+def cuda_libs():
+    """Make PyTorch find the NVIDIA libraries that Lab 0 installs into your own environment.
+    A kernel that was already running before Step 8 cannot see a folder that did not exist when it started,
+    so the library is loaded here by its full path. Safe to run many times."""
+    import ctypes
+    import glob
+    import sysconfig
+    site = sysconfig.get_paths()["purelib"]
+    for path in glob.glob(os.path.join(site, "nvidia", "cu12", "lib", "libcudss.so.0")):
+        try:
+            ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            pass
+
+
+cuda_libs()              # also when a notebook starts with import labview
