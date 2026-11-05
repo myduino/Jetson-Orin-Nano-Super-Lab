@@ -7,16 +7,14 @@ CN=$'\033[0m'
 title() { printf '\n%s== %s ==%s\n' "$CT" "$*" "$CN"; }
 say()   { printf '%s%s%s\n' "$CT" "$*" "$CN"; }
 
-# ---- Students: everybody has their own folder ----
-# ~/students/<name>/lab1 ... lab9   the work of one student (notebooks, pictures, engines)
-# ~/students/_shared/               the model files, for everybody
-# LAB_HOME is the folder of the student who is working in THIS terminal. The notebooks use it, so
-# two students on one Jetson never write into each other's folder.
-STUDENTS="$HOME/students"
-SHARED="$STUDENTS/_shared"
-SESSIONS="$HOME/.lab_sessions"     # which student works in which terminal
+# ---- Classes and students: the student folder is the whole environment ----
+# ~/myduino-jetson-lab/<class>/<student>/   everything of one student:
+#     lab1 ... lab9   notebooks, pictures, engines          models/   the AI model files
+#     .jupyter/ .ipython/ .config/ .bash_history   the Jupyter, IPython and shell settings
+# LAB_HOME is the folder of the student who works in THIS session; LAB_CLASS is the class.
+# Only the Python packages (the venv) are shared, because PyTorch is several GB.
+ROOT="$HOME/myduino-jetson-lab"
 SHARE_DIR="$HOME/.lab_share"       # the JupyterLab server of each working student
-LAB_HOME="${LAB_HOME:-$STUDENTS/name}"
 
 # clean_name: letters, numbers and _ only, lower case, at most 20 characters
 clean_name() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9_]/_/g; s/^_*//; s/_*$//' | cut -c1-20; }
@@ -27,68 +25,126 @@ valid_name() {
   case "$1" in *[!0-9]*) return 0 ;; esac
   return 1
 }
+valid_class() { case "$1" in ''|*[!a-z0-9_]*) return 1 ;; esac; }
 
-list_students() {
+# A session is known by its key "<class>__<student>" (file names), shown as "<class>/<student>"
+key_of() { printf '%s__%s' "$1" "$2"; }
+show_key() { printf '%s' "${1/__//}"; }
+
+list_classes() {
   local d
-  for d in "$STUDENTS"/*/; do
+  for d in "$ROOT"/*/; do
     [ -d "$d" ] || continue
     d="${d%/}"; d="${d##*/}"
     case "$d" in _*) ;; *) echo "$d" ;; esac
   done
 }
 
-# prepare_student NAME: set LAB_HOME and make the folders (no questions, no side effects on the terminal)
+list_students() {   # list_students CLASS
+  local d
+  for d in "$ROOT/$1"/*/; do
+    [ -d "$d" ] || continue
+    d="${d%/}"; echo "${d##*/}"
+  done
+}
+
+# last_used DIR: the date of the newest file in DIR
+last_used() {
+  python3 - "$1" <<'PY'
+import os, sys, time
+newest = 0
+for folder, _, files in os.walk(sys.argv[1]):
+    for f in files:
+        try:
+            newest = max(newest, os.lstat(os.path.join(folder, f)).st_mtime)
+        except OSError:
+            pass
+print(time.strftime("%Y-%m-%d", time.localtime(newest)) if newest else "-")
+PY
+}
+
+class_add() {   # teacher: lab class add <name>
+  local c
+  c="$(clean_name "$1")"
+  valid_class "$c" || { echo "Use letters or numbers, for example:  lab class add a"; return 1; }
+  if [ -d "$ROOT/$c" ]; then echo "Class $c exists already."; return 0; fi
+  mkdir -p "$ROOT/$c"
+  echo "Class $c is ready. Its students start with:  lab start <name> class $c camera 0"
+}
+
+# prepare_student CLASS NAME: set LAB_CLASS and LAB_HOME and make the folders
 prepare_student() {
   local n
-  export LAB_HOME="$STUDENTS/$1"
-  mkdir -p "$SHARED/models" "$SESSIONS"
+  export LAB_CLASS="$1" LAB_HOME="$ROOT/$1/$2"
   for n in 1 2 3 4 5 6 7 8 9; do mkdir -p "$LAB_HOME/lab$n"; done
-  [ -e "$LAB_HOME/models" ] || ln -s "$SHARED/models" "$LAB_HOME/models"
+  mkdir -p "$LAB_HOME/models" "$LAB_HOME/.jupyter" "$LAB_HOME/.ipython" "$LAB_HOME/.config"
 }
 
-# use_student NAME: this terminal now belongs to NAME
-use_student() {
-  local fresh=""
-  [ -d "$STUDENTS/$1" ] || fresh=1
-  prepare_student "$1"
-  [ -n "$fresh" ] && echo "Welcome, $1! Your folder is made: $LAB_HOME"
-  echo "$1" > "$SESSIONS/$PPID"
-  echo "$1" > ~/.lab_student
+# student_env: Jupyter, IPython and the AI tools keep their settings in the student's folder, not in the account
+student_env() {
+  export JUPYTER_CONFIG_DIR="$LAB_HOME/.jupyter/config" JUPYTER_DATA_DIR="$LAB_HOME/.jupyter/data" \
+    JUPYTER_RUNTIME_DIR="$LAB_HOME/.jupyter/runtime" JUPYTERLAB_SETTINGS_DIR="$LAB_HOME/.jupyter/settings" \
+    JUPYTERLAB_WORKSPACES_DIR="$LAB_HOME/.jupyter/workspaces" IPYTHONDIR="$LAB_HOME/.ipython" \
+    YOLO_CONFIG_DIR="$LAB_HOME/.config/Ultralytics" MPLCONFIGDIR="$LAB_HOME/.config/matplotlib"
+  mkdir -p "$JUPYTER_CONFIG_DIR" "$JUPYTER_DATA_DIR" "$JUPYTER_RUNTIME_DIR" "$JUPYTERLAB_SETTINGS_DIR" \
+    "$JUPYTERLAB_WORKSPACES_DIR" "$YOLO_CONFIG_DIR" "$MPLCONFIGDIR"
 }
 
-# choose_student [NAME]: ask who is working (or take NAME) and use that student
+# choose_class [NAME]: sets CHOSEN_CLASS. The class must exist (the teacher makes it with  lab class add).
+choose_class() {
+  local c="$1" list count
+  list="$(list_classes | tr '\n' ' ')"
+  if [ -n "$c" ]; then
+    c="$(clean_name "$c")"
+    if [ ! -d "$ROOT/$c" ] || [ "${c#_}" != "$c" ]; then
+      echo "There is no class called $c."
+      [ -n "$list" ] && echo "Classes on this Jetson: $list" || echo "Ask your teacher to run:  lab class add $c"
+      return 1
+    fi
+  else
+    count="$(echo $list | wc -w | tr -d ' ')"
+    if [ "$count" = 0 ]; then echo "There is no class yet. Ask your teacher to run:  lab class add <class name>"; return 1; fi
+    if [ "$count" = 1 ]; then c="${list% }"
+    else
+      [ -t 0 ] || { echo "Which class?  lab start <name> class <class>   (classes: $list)"; return 1; }
+      while [ -z "$c" ] || [ ! -d "$ROOT/$c" ]; do
+        echo "Classes on this Jetson: $list"
+        read -r -p "Your class: " c || return 1
+        c="$(clean_name "$c")"
+      done
+    fi
+  fi
+  CHOSEN_CLASS="$c"
+}
+
+# choose_student CLASS [NAME]: ask who is working (or take NAME) and use that student
 choose_student() {
-  local name="$1" last existing
-  mkdir -p "$STUDENTS" "$SESSIONS"
-  last="$(cat ~/.lab_student 2>/dev/null)"
+  local c="$1" name="$2" existing
   if [ -n "$name" ]; then
     name="$(clean_name "$name")"
-    valid_name "$name" || { echo "Use letters, for example:  lab start ali"; return 1; }
+    valid_name "$name" || { echo "Use letters, for example:  lab start ali class $c"; return 1; }
   else
-    existing="$(list_students | tr '\n' ' ')"
-    [ -t 0 ] || { name="$last"; [ -n "$name" ] || { echo "Tell me who you are:  lab start <your name>"; return 1; }; }
+    [ -t 0 ] || { echo "Tell me who you are:  lab start <your name> class $c"; return 1; }
+    existing="$(list_students "$c" | tr '\n' ' ')"
     while [ -z "$name" ]; do
-      [ -n "$existing" ] && echo "Students on this Jetson: $existing"
-      read -r -p "Your name${last:+ (press Enter for $last)}: " name
-      [ -z "$name" ] && name="$last"
+      [ -n "$existing" ] && echo "Students in class $c: $existing"
+      read -r -p "Your name: " name || return 1
       name="$(clean_name "$name")"
       valid_name "$name" || { echo "Please type letters, for example: ali"; name=""; }
     done
   fi
-  use_student "$name"
+  local fresh=""
+  [ -d "$ROOT/$c/$name" ] || fresh=1
+  prepare_student "$c" "$name"
+  [ -n "$fresh" ] && echo "Welcome, $name! Your folder is made: $LAB_HOME"
+  return 0
 }
 
-# ensure_student: used by every lab command, so LAB_HOME is always a student's folder
+# ensure_student: for lab me / lab reset, which only work inside a session
 ensure_student() {
-  local name f
-  for f in "$SESSIONS"/*; do      # forget terminals that are closed
-    [ -f "$f" ] || continue
-    kill -0 "${f##*/}" 2>/dev/null || rm -f "${SESSIONS:?}/${f##*/}"
-  done
-  if [ "${LAB_HOME%/*}" = "$STUDENTS" ] && [ -d "$LAB_HOME" ]; then return 0; fi   # set by lab start (JupyterLab terminals)
-  name="$(cat "$SESSIONS/$PPID" 2>/dev/null)"
-  if [ -n "$name" ] && [ -d "$STUDENTS/$name" ]; then use_student "$name"; return 0; fi
-  choose_student
+  case "$LAB_HOME" in "$ROOT"/*/*) [ -d "$LAB_HOME" ] && return 0 ;; esac
+  echo "Start your session first:  lab start <your name> class <class>"
+  return 1
 }
 
 # ---- Notebooks (lab start / lab reset) ----
@@ -138,25 +194,35 @@ camera_user() {
   kill -0 "$opid" 2>/dev/null && echo "$owner"
 }
 
+# camera_of KEY: the camera number a working student uses (empty if none)
+camera_of() {
+  local f owner opid
+  for f in "$CAM_LOCKS"/*; do
+    [ -f "$f" ] || continue
+    read -r owner opid < "$f"
+    if [ "$owner" = "$1" ] && kill -0 "$opid" 2>/dev/null; then echo "${f##*/}"; return; fi
+  done
+}
+
 cameras_show() {
   local n dev name user any=""
   while read -r n dev name; do
     [ -n "$n" ] || continue; any=1
     user="$(camera_user "$n")"
-    printf '  camera %s   %s   %s   %s\n' "$n" "$dev" "${name:-?}" "${user:+(used by $user)}"
+    printf '  camera %s   %s   %s   %s\n' "$n" "$dev" "${name:-?}" "${user:+(used by $(show_key "$user"))}"
   done < <(camera_nodes)
   [ -n "$any" ] || echo "  No USB camera found. Plug it in firmly and try again."
 }
 
-cam_take() {   # cam_take NUMBER STUDENT
+cam_take() {   # cam_take NUMBER KEY
   local user
   user="$(camera_user "$1")"
-  if [ -n "$user" ] && [ "$user" != "$2" ]; then echo "Camera $1 is used by $user."; return 1; fi
+  if [ -n "$user" ] && [ "$user" != "$2" ]; then echo "Camera $1 is used by $(show_key "$user")."; return 1; fi
   mkdir -p "$CAM_LOCKS"
   echo "$2 $$" > "$CAM_LOCKS/$1"
 }
 
-# cam_release_of STUDENT [any]: free the cameras that THIS session took. With "any" (the teacher) free all of them.
+# cam_release_of KEY [any]: free the cameras that THIS session took. With "any" (the teacher) free all of them.
 cam_release_of() {
   local f
   for f in "$CAM_LOCKS"/*; do
@@ -166,38 +232,95 @@ cam_release_of() {
   done
 }
 
-# ---- A student session: lab start <name> [camera N] ----
+# ---- JupyterLab servers of the students ----
+port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+share_alive() { [ -f "$SHARE_DIR/$1.pid" ] && kill -0 "$(cat "$SHARE_DIR/$1.pid")" 2>/dev/null; }
+
+# port_taken PORT: true when the folder of ANOTHER student keeps that port
+port_taken() {
+  local f
+  for f in "$ROOT"/*/*/.port; do
+    [ -f "$f" ] || continue
+    [ "$f" = "$LAB_HOME/.port" ] && continue
+    [ "$(cat "$f")" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# student_port: the port of this student's JupyterLab. It is chosen once, kept in the student's folder
+# (.port) and shown to the teacher, so it is the same in every session.
+student_port() {
+  local port
+  port="$(cat "$LAB_HOME/.port" 2>/dev/null)"
+  if [ -n "$port" ] && ! port_busy "$port" && ! port_taken "$port"; then echo "$port"; return; fi
+  port=8801
+  while port_busy "$port" || port_taken "$port"; do port=$((port+1)); done
+  echo "$port" > "$LAB_HOME/.port"
+  echo "$port"
+}
+
+share_list() {
+  local f k ip host any=""
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"; host="$(hostname 2>/dev/null)"; host="${host%.local}"
+  for f in "$SHARE_DIR"/*.port; do
+    [ -f "$f" ] || continue
+    k="${f##*/}"; k="${k%.port}"; any=1
+    if share_alive "$k"; then
+      printf '%s%-18s%s port %s   http://%s:%s/?token=%s\n' "$CT" "$(show_key "$k")" "$CN" "$(cat "$f")" "${ip:-$host}" "$(cat "$f")" "$(cat "$SHARE_DIR/$k.token")"
+    else
+      printf '%-18s not running (a lost connection? free it with:  lab stop %s)\n' "$(show_key "$k")" "$(show_key "$k" | tr '/' ' ')"
+    fi
+  done
+  [ -n "$any" ] || echo "Nobody is working now."
+}
+
+# share_stop [KEY ...]: stop the JupyterLab of these sessions (all of them when no key is given)
+share_stop() {
+  local keys="$*" f k pid
+  if [ -z "$keys" ]; then
+    for f in "$SHARE_DIR"/*.pid; do [ -f "$f" ] || continue; k="${f##*/}"; keys="$keys ${k%.pid}"; done
+  fi
+  for k in $keys; do
+    [ -n "$k" ] || continue
+    if share_alive "$k"; then
+      pid="$(cat "$SHARE_DIR/$k.pid")"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
+      echo "Stopped the JupyterLab of $(show_key "$k")"
+    fi
+    rm -f "${SHARE_DIR:?}/${k:?}".pid "${SHARE_DIR:?}/${k:?}".port "${SHARE_DIR:?}/${k:?}".token "${SHARE_DIR:?}/${k:?}".owner
+  done
+}
+
+# ---- A student session: lab start <name> class <class> [camera N] ----
 # Starts the JupyterLab of the student in the background and opens a shell that is ready to work in:
 # the Python environment is on, the folder is the student's own, the camera is the chosen one.
 # When the student types "exit" the JupyterLab stops and the camera is free again.
-# session_busy NAME: true (and a message) when NAME already works in another terminal
+# session_busy KEY: true (and a message) when this student already works in another terminal
 session_busy() {
   local opid
   share_alive "$1" || return 1
   opid="$(cat "$SHARE_DIR/$1.owner" 2>/dev/null)"
   [ -n "$opid" ] && kill -0 "$opid" 2>/dev/null || return 1
-  echo "$1 is already working in another terminal (JupyterLab: http://$(my_ip):$(cat "$SHARE_DIR/$1.port")/?token=$(cat "$SHARE_DIR/$1.token"))."
+  echo "$(show_key "$1") is already working in another terminal (JupyterLab: http://$(my_ip):$(cat "$SHARE_DIR/$1.port")/?token=$(cat "$SHARE_DIR/$1.token"))."
   echo "Use that terminal, or close it first (type exit there)."
 }
 
-session_server() {   # session_server NAME FIRST_NOTEBOOK  -> sets SESSION_PORT and SESSION_TOKEN
-  local name="$1" first="$2" port token open="--no-browser" opid
+session_server() {   # session_server KEY FIRST_NOTEBOOK  -> sets SESSION_PORT and SESSION_TOKEN
+  local key="$1" first="$2" port token open="--no-browser"
   mkdir -p "$SHARE_DIR"; chmod 700 "$SHARE_DIR"
   STARTED_SERVER=""
-  session_busy "$name" && return 1
-  share_alive "$name" && share_stop "$name" > /dev/null      # a server left behind by a lost connection
+  session_busy "$key" && return 1
+  share_alive "$key" && share_stop "$key" > /dev/null      # a server left behind by a lost connection
   [ -z "$SSH_CONNECTION" ] && [ -n "$DISPLAY" ] && open=""     # at the Jetson screen: open the browser there
-  port=8888
-  while port_busy "$port" || grep -qs "^$port\$" "$SHARE_DIR"/*.port; do port=$((port+1)); done
+  port="$(student_port)"
   token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')"
   (
     cd "$LAB_HOME" || exit 1
-    nohup jupyter lab $open --ip=0.0.0.0 --port="$port" --ServerApp.token="$token" \
-      --ServerApp.allow_remote_access=True "$first" > "$LAB_HOME/.jupyter.log" 2>&1 &
-    echo $! > "$SHARE_DIR/$name.pid"
+    nohup jupyter lab $open --ip=0.0.0.0 --port="$port" --ServerApp.port_retries=0 --ServerApp.token="$token" \
+      --ServerApp.allow_remote_access=True "$first" > "$LAB_HOME/.jupyter/server.log" 2>&1 &
+    echo $! > "$SHARE_DIR/$key.pid"
   )
-  echo "$port" > "$SHARE_DIR/$name.port"; echo "$token" > "$SHARE_DIR/$name.token"; echo "$$" > "$SHARE_DIR/$name.owner"
-  chmod 600 "$SHARE_DIR/$name".*
+  echo "$port" > "$SHARE_DIR/$key.port"; echo "$token" > "$SHARE_DIR/$key.token"; echo "$$" > "$SHARE_DIR/$key.owner"
+  chmod 600 "$SHARE_DIR/$key".*
   SESSION_PORT="$port"; SESSION_TOKEN="$token"; STARTED_SERVER=1
 }
 
@@ -205,53 +328,57 @@ my_ip() { local ip; ip="$(hostname -I 2>/dev/null | awk '{print $1}')"; echo "${
 
 session_cleanup() {
   [ -n "$SESSION_DONE" ] && return; SESSION_DONE=1
-  [ -n "$STARTED_SERVER" ] && share_stop "$SESSION_NAME" > /dev/null
-  cam_release_of "$SESSION_NAME"
+  [ -n "$STARTED_SERVER" ] && share_stop "$SESSION_KEY" > /dev/null
+  cam_release_of "$SESSION_KEY"
   [ -n "$SESSION_RC" ] && rm -f "$SESSION_RC"
 }
 
 # lab_link [N]: inside a session the JupyterLab already runs, so show the link of Start_Here or of the notebook of lab N
 lab_link() {
-  local n b path="lab/tree/Start_Here.ipynb"
-  n="$(basename "$LAB_HOME")"
+  local b path="lab/tree/Start_Here.ipynb" key
+  key="$(key_of "$LAB_CLASS" "$(basename "$LAB_HOME")")"
   if [ -n "$1" ]; then
     b="$(basename "$(notebook_of "$1")" 2>/dev/null)"
     if [ -n "$b" ] && [ "$b" != "." ]; then path="lab/tree/lab$1/$b"; else echo "Lab $1 has no notebook yet. Here is Start_Here."; fi
   fi
   sync_notebooks
   echo "Your JupyterLab is running. Open this link in the browser of your laptop:"
-  echo "  http://$(my_ip):$(cat "$SHARE_DIR/$n.port")/$path?token=$(cat "$SHARE_DIR/$n.token")"
+  echo "  http://$(my_ip):$(cat "$SHARE_DIR/$key.port")/$path?token=$(cat "$SHARE_DIR/$key.token")"
 }
 
-# lab_start [NAME] [camera N] [LAB]
+# lab_start [NAME] [class CLASS] [camera N] [LAB]
 lab_start() {
-  local name="" labn="" cam="" prev="" a first="Start_Here.ipynb" b dev rc ip
+  local name="" labn="" cam="" cls="" prev="" a first="Start_Here.ipynb" b dev rc ip
   for a in "$@"; do
     if [ "$prev" = camera ]; then cam="$a"; prev=""; continue; fi
+    if [ "$prev" = class ]; then cls="$a"; prev=""; continue; fi
     case "$a" in
-      camera) prev=camera ;;
+      camera|class) prev="$a" ;;
       ''|*[!0-9]*) name="$a" ;;
       *) labn="$a" ;;
     esac
   done
   [ "$prev" = camera ] && { echo "Which camera?  Type  lab cameras  to see the numbers."; return 1; }
-  if [ -n "$LAB_IN_SESSION" ]; then      # we are inside the shell of a session: do not start a second one
+  [ "$prev" = class ] && { echo "Which class?  For example:  lab start ali class a camera 0"; return 1; }
+  if [ -n "$LAB_IN_SESSION" ]; then      # we are inside a session: do not start a second one
     if [ -n "$name" ] && [ "$(clean_name "$name")" != "$(basename "$LAB_HOME")" ]; then
-      echo "You are working as $(basename "$LAB_HOME"). Type  exit  first, then  lab start $name"; return 1
+      echo "You are working as $(basename "$LAB_HOME") (class $LAB_CLASS). Type  exit  first, then  lab start $name"; return 1
     fi
     lab_link "$labn"; return $?
   fi
-  if [ -n "$name" ]; then choose_student "$name" || return 1; else ensure_student || return 1; fi
+  choose_class "$cls" || return 1
+  choose_student "$CHOSEN_CLASS" "$name" || return 1
   if [ ! -f ~/venvs/jetson/bin/activate ]; then
     echo "The course environment is missing. Run  bash $HERE/setup.sh  first."; return 1
   fi
-  SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""
-  mkdir -p "$SHARE_DIR"; session_busy "$SESSION_NAME" && return 1
+  SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_KEY="$(key_of "$LAB_CLASS" "$SESSION_NAME")"
+  SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""
+  mkdir -p "$SHARE_DIR"; session_busy "$SESSION_KEY" && return 1
   if [ -n "$cam" ]; then
-    case "$cam" in *[!0-9]*) echo "The camera is a number, for example:  lab start $SESSION_NAME camera 0"; return 1 ;; esac
+    case "$cam" in *[!0-9]*) echo "The camera is a number, for example:  lab start $SESSION_NAME class $LAB_CLASS camera 0"; return 1 ;; esac
     dev="$(camera_path "$cam")"
     if [ -z "$dev" ]; then echo "There is no camera number $cam. These cameras are plugged in:"; cameras_show; return 1; fi
-    cam_take "$cam" "$SESSION_NAME" || { cameras_show; return 1; }
+    cam_take "$cam" "$SESSION_KEY" || { cameras_show; return 1; }
     export LAB_CAMERA="$dev"
   else
     unset LAB_CAMERA
@@ -260,69 +387,54 @@ lab_start() {
   trap 'session_cleanup; exit 143' HUP TERM
   trap 'session_cleanup' EXIT
   source ~/venvs/jetson/bin/activate
+  student_env
   sync_notebooks
   if [ -n "$labn" ]; then
     b="$(basename "$(notebook_of "$labn")" 2>/dev/null)"
     if [ -n "$b" ] && [ "$b" != "." ]; then first="lab$labn/$b"
     else echo "Lab $labn has no notebook yet. Opening Start_Here instead."; fi
   fi
-  export LAB_HOME
-  session_server "$SESSION_NAME" "$first" || { session_cleanup; return 1; }
+  export LAB_HOME LAB_CLASS LAB_IN_SESSION=1 HISTFILE="$LAB_HOME/.bash_history"
+  session_server "$SESSION_KEY" "$first" || { session_cleanup; return 1; }
   ip="$(my_ip)"
   echo
-  say "Hello, $SESSION_NAME!"
+  say "Hello, $SESSION_NAME!  (class $LAB_CLASS)"
   echo "  Your folder:     $LAB_HOME"
   echo "  Your camera:     ${LAB_CAMERA:-none chosen}${cam:+  (camera $cam)}"
   echo "  Your JupyterLab: http://$ip:$SESSION_PORT/?token=$SESSION_TOKEN"
-  echo "                   Open this link in the browser of your laptop."
+  echo "                   Open this link in the browser of your laptop. Your port, $SESSION_PORT, is always the same."
   echo "  When you finish: type  exit  . That stops your JupyterLab and frees the camera."
   echo
   rc="$(mktemp)"; SESSION_RC="$rc"
   cat > "$rc" <<RCEOF
 [ -f ~/.bashrc ] && source ~/.bashrc
 source ~/venvs/jetson/bin/activate
-export LAB_HOME="$LAB_HOME" LAB_IN_SESSION=1
+export HISTFILE="$LAB_HOME/.bash_history"
 ${LAB_CAMERA:+export LAB_CAMERA="$LAB_CAMERA"}
 export PYTHONPATH="$HERE/labs\${PYTHONPATH:+:\$PYTHONPATH}"
 cd "$LAB_HOME"
-PS1="($SESSION_NAME) \u@\h:\w\\\$ "
+PS1="($LAB_CLASS/$SESSION_NAME) \u@\h:\w\\\$ "
 RCEOF
   bash --rcfile "$rc" -i
   session_cleanup
   echo "Goodbye, $SESSION_NAME. Your JupyterLab is stopped and the camera is free."
 }
 
-# lab_stop NAME: the teacher frees the JupyterLab and the camera of a student whose connection was lost
+# lab_stop CLASS NAME: the teacher frees the JupyterLab and the camera of a student whose connection was lost
 lab_stop() {
-  local n
-  n="$(clean_name "$1")"
-  [ -n "$n" ] || { echo "Usage:  lab stop <name>"; return 1; }
-  share_stop "$n"; cam_release_of "$n" any
-  echo "Stopped the session of $n."
+  local c n key
+  c="$(clean_name "$1")"; n="$(clean_name "$2")"
+  [ -n "$c" ] && [ -n "$n" ] || { echo "Usage:  lab stop <class> <name>"; return 1; }
+  key="$(key_of "$c" "$n")"
+  share_stop "$key"; cam_release_of "$key" any
+  echo "Stopped the session of $c/$n."
 }
-
-# ---- Memory: only one TensorRT build at a time ----
-BUILD_LOCK="$HOME/.lab_build.lock"
-build_acquire() {
-  local owner opid shown=""
-  while ! mkdir "$BUILD_LOCK" 2>/dev/null; do
-    owner="$(cat "$BUILD_LOCK/owner" 2>/dev/null)"; opid="${owner##* }"
-    if [ -n "$opid" ] && ! kill -0 "$opid" 2>/dev/null; then rm -rf "${BUILD_LOCK:?}"; continue; fi
-    if [ -z "$shown" ]; then
-      say "${owner% *} is building an engine now. Only one build at a time fits in the 8 GB memory, so you wait here."
-      shown=1
-    fi
-    sleep 10
-  done
-  echo "$(basename "$LAB_HOME") $$" > "$BUILD_LOCK/owner"
-}
-build_release() { rm -rf "${BUILD_LOCK:?}"; }
 
 # lab_reset N: put a fresh copy of the notebook of lab N in your folder (your old copy is kept as .old)
 lab_reset() {
   local src b dest
   src="$(notebook_of "$1")"
-  if [ -z "$1" ] || [ -z "$src" ]; then echo "Usage:  lab reset <lab number>   (only labs with a notebook)"; return 1; fi
+  if [ -z "$1" ] || [ -z "$src" ]; then echo "Usage:  lab reset <lab number>"; return 1; fi
   b="$(basename "$src")"; dest="$LAB_HOME/lab$1/$b"
   mkdir -p "$LAB_HOME/lab$1"
   if [ -f "$dest" ]; then mv "$dest" "$dest.old"; echo "Your old copy was kept as $dest.old"; fi
@@ -330,66 +442,68 @@ lab_reset() {
   echo "Fresh notebook: $dest"
 }
 
-# ---- JupyterLab servers of the students ----
-port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
-share_alive() { [ -f "$SHARE_DIR/$1.pid" ] && kill -0 "$(cat "$SHARE_DIR/$1.pid")" 2>/dev/null; }
-
-share_list() {
-  local f n ip host any=""
-  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"; host="$(hostname 2>/dev/null)"; host="${host%.local}"
-  for f in "$SHARE_DIR"/*.port; do
-    [ -f "$f" ] || continue
-    n="${f##*/}"; n="${n%.port}"; any=1
-    if share_alive "$n"; then
-      printf '%s%-12s%s http://%s:%s/?token=%s\n' "$CT" "$n" "$CN" "${ip:-$host}" "$(cat "$f")" "$(cat "$SHARE_DIR/$n.token")"
-      printf '             or http://%s.local:%s/?token=%s\n' "$host" "$(cat "$f")" "$(cat "$SHARE_DIR/$n.token")"
-    else
-      printf '%-12s not running (a lost connection? free it with:  lab stop %s)\n' "$n" "$n"
-    fi
+# ---- Teacher: classes, clean up, check the board ----
+# classes_table: one line for each class
+classes_table() {
+  local c n size used working f k
+  printf '%s  %-16s %-9s %-8s %-12s %s%s\n' "$CT" CLASS STUDENTS SIZE "LAST USED" "WORKING NOW" "$CN"
+  for c in $(list_classes); do
+    n="$(list_students "$c" | wc -l | tr -d ' ')"
+    size="$(du -sh "$ROOT/$c" 2>/dev/null | cut -f1)"
+    working=0
+    for f in "$SHARE_DIR"/"$c"__*.pid; do
+      [ -f "$f" ] || continue
+      k="${f##*/}"; k="${k%.pid}"; share_alive "$k" && working=$((working+1))
+    done
+    printf '  %-16s %-9s %-8s %-12s %s\n' "$c" "$n" "$size" "$(last_used "$ROOT/$c")" "$working"
   done
-  [ -n "$any" ] || echo "Nobody is working now."
+  [ -n "$(list_classes)" ] || echo "  No class yet. Make one with:  lab class add <name>"
 }
 
-share_stop() {
-  local names="$*" f n pid
-  if [ -z "$names" ]; then
-    for f in "$SHARE_DIR"/*.pid; do [ -f "$f" ] || continue; n="${f##*/}"; names="$names ${n%.pid}"; done
-  fi
-  for n in $names; do
-    n="$(clean_name "$n")"
-    [ -n "$n" ] || continue
-    if share_alive "$n"; then
-      pid="$(cat "$SHARE_DIR/$n.pid")"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
-      echo "Stopped the JupyterLab of $n"
-    fi
-    rm -f "${SHARE_DIR:?}/${n:?}".pid "${SHARE_DIR:?}/${n:?}".port "${SHARE_DIR:?}/${n:?}".token "${SHARE_DIR:?}/${n:?}".owner
+# class_show CLASS: the students of one class, with their port, camera and state
+class_show() {
+  local c s key port state cam
+  c="$(clean_name "$1")"
+  [ -d "$ROOT/$c" ] || { echo "There is no class called $c."; return 1; }
+  printf '%s  Class %s%s\n' "$CT" "$c" "$CN"
+  printf '  %-16s %-6s %-8s %-8s %-12s %s\n' STUDENT PORT SIZE CAMERA "LAST USED" STATE
+  for s in $(list_students "$c"); do
+    key="$(key_of "$c" "$s")"; port="$(cat "$ROOT/$c/$s/.port" 2>/dev/null)"
+    if share_alive "$key"; then state="working"; cam="$(camera_of "$key")"; else state="-"; cam=""; fi
+    printf '  %-16s %-6s %-8s %-8s %-12s %s\n' "$s" "${port:--}" "$(du -sh "$ROOT/$c/$s" 2>/dev/null | cut -f1)" "${cam:--}" "$(last_used "$ROOT/$c/$s")" "$state"
   done
+  [ -n "$(list_students "$c")" ] || echo "  No student yet."
 }
 
-# ---- Teacher: clean up, check the board, share TensorRT engines ----
+# lab_clean [CLASS [NAME]]: no argument lists the classes; a class deletes the class; a class and a name deletes one student
 lab_clean() {
-  local n d size again
-  n="$(clean_name "$1")"
-  if [ -z "$n" ]; then
-    echo "Students on this Jetson:"
-    for d in $(list_students); do printf '  %-14s %s\n' "$d" "$(du -sh "$STUDENTS/$d" 2>/dev/null | cut -f1)"; done
-    echo "Delete one with:  lab clean <name>"
+  local c n target size again s
+  c="$(clean_name "$1")"; n="$(clean_name "$2")"
+  if [ -z "$c" ]; then
+    classes_table
+    echo
+    echo "See the students of a class:   lab class <class>"
+    echo "Delete one student:            lab clean <class> <name>"
+    echo "Delete the whole class:        lab clean <class>"
     return 0
   fi
-  if [ ! -d "$STUDENTS/$n" ] || [ "${n#_}" != "$n" ]; then echo "There is no student called $n."; return 1; fi
+  if [ ! -d "$ROOT/$c" ] || [ "${c#_}" != "$c" ]; then echo "There is no class called $c."; return 1; fi
+  if [ -n "$n" ]; then target="$ROOT/$c/$n"; else target="$ROOT/$c"; fi
+  if [ ! -d "$target" ]; then echo "There is no student called $n in class $c."; return 1; fi
   if [ ! -t 0 ]; then echo "lab clean asks a question, so run it in a terminal."; return 1; fi
-  size="$(du -sh "$STUDENTS/$n" | cut -f1)"
-  say "This deletes everything of $n ($size) in $STUDENTS/$n"
-  echo "Make sure $n has copied the work to a laptop or a USB drive first."
-  read -r -p "Type the name again to delete: " again
-  [ "$again" = "$n" ] || { echo "Cancelled. Nothing was deleted."; return 1; }
-  share_stop "$n"; cam_release_of "$n" any
-  rm -rf "${STUDENTS:?}/${n:?}"
-  for d in "$SESSIONS"/*; do
-    [ -f "$d" ] && [ "$(cat "$d")" = "$n" ] && rm -f "${SESSIONS:?}/${d##*/}"
-  done
-  [ "$(cat ~/.lab_student 2>/dev/null)" = "$n" ] && rm -f ~/.lab_student
-  echo "Deleted $n."
+  size="$(du -sh "$target" | cut -f1)"
+  say "This deletes everything in $target ($size)"
+  echo "Make sure the students copied their work to a laptop or a USB drive first."
+  again="${n:-$c}"
+  read -r -p "Type \"$again\" to delete: " s
+  [ "$s" = "$again" ] || { echo "Cancelled. Nothing was deleted."; return 1; }
+  if [ -n "$n" ]; then
+    share_stop "$(key_of "$c" "$n")"; cam_release_of "$(key_of "$c" "$n")" any
+  else
+    for s in $(list_students "$c"); do share_stop "$(key_of "$c" "$s")"; cam_release_of "$(key_of "$c" "$s")" any; done
+  fi
+  rm -rf "${target:?}"
+  echo "Deleted $target."
 }
 
 lab_check() {
@@ -421,7 +535,7 @@ lab_check() {
   cameras_show
   share_list
   ask "Stop all of them and free the cameras?" && { share_stop; rm -f "${CAM_LOCKS:?}"/*; }
-  title "5. Students on this Jetson"
-  for d in $(list_students); do printf '  %-14s %s\n' "$d" "$(du -sh "$STUDENTS/$d" 2>/dev/null | cut -f1)"; done
-  echo "Delete a student with:  lab clean <name>"
+  title "5. Classes on this Jetson"
+  classes_table
+  echo "Delete a class or a student with:  lab clean <class> [name]"
 }
