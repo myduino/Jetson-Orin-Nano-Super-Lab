@@ -1,103 +1,97 @@
 # Myduino Jetson Orin Nano Super Lab (JetPack 6.2)
 
 Hands-on lab code for the Myduino Jetson Orin Nano Super Training Bundle. No Linux background needed.
-The lab manuals (PDF files) are in Google Classroom.
+The lab manuals (PDF files) are in Google Classroom. Every lab is also a notebook, and the notebooks are the main way to learn.
 
-## Start Here (on the Jetson)
+## How the class works
 
-Once per Jetson (needs internet, takes about a minute):
+```
+Teacher PC (Windows)                      Jetson 1, Jetson 2, ...
+ the teacher page  <------ reports ------  the lab agent (starts by itself when the Jetson starts)
+ classes, students ------- assigns ------> a JupyterLab for each student, with the camera the teacher chose
+```
+
+The teacher puts each student on a Jetson and a camera, on the teacher page. The page shows an **address** (for example `192.168.0.234:8881`) and a **PIN** for the student. The student opens the address in a browser, types the PIN once, and works in their own JupyterLab. **No SSH, no terminal and no command are needed to start.** Everything happens in the browser: the Linux commands, the Python code and the live camera all run inside the notebooks.
+
+## Setup (once)
+
+**1. On the teacher's Windows PC** (needs Python 3: `winget install Python.Python.3.12`, and Git):
+
+```powershell
+git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
+cd Jetson-Orin-Nano-Super-Lab
+powershell -ExecutionPolicy Bypass -File .\setup-teacher.ps1
+```
+
+The first time, it asks you to choose a teacher password. It prints the address of the teacher page and a **class key**, and keeps running: leave that window open while you teach. It opens port 8800 in Windows Firewall (run PowerShell as Administrator once if it cannot). On Mac or Linux use `bash setup-teacher.sh`.
+
+**2. On each Jetson** (open a terminal, once):
 
 ```bash
 cd ~
 git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
 cd Jetson-Orin-Nano-Super-Lab
-bash setup.sh        # Python environment and JupyterLab only
+bash setup-lab.sh <address of the teacher page> <class key>
 ```
 
-No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
+The teacher page prints this exact line. `setup-lab.sh` installs JupyterLab and the lab agent, and the agent starts by itself whenever the Jetson starts. Refresh the teacher page: the Jetson appears in the list.
 
-Then open a **new terminal** (or connect with `ssh orin_nano@<address of the Jetson>`). The teacher makes a class once (`lab class add a`), and then each student types:
+**3. Install the AI software, once for each Jetson:** put one student (or yourself) on the Jetson and run **Part 0 of the Lab 0 notebook**. It installs CuPy, PyTorch and Ultralytics with visible steps, and takes 20 to 40 minutes. Then every student runs Part 0b, which downloads their own AI models (about 60 MB).
 
-```bash
-lab start yourname class a camera 0
-```
+No `git`? On GitHub press **Code, then Download ZIP** and extract it.
 
-Use the same name every time, the class name and the camera number your teacher gives you. It prints a link: open it in the browser and the Start Here page with all the lab notebooks appears. **Everything else happens in the browser.** The Linux commands, the Python code and the live camera all run inside the notebooks, and the commands are shown step by step. The big install (CuPy, PyTorch, Ultralytics) is Part 0 of the Lab 0 notebook, so the students watch it happen. Only the Python packages are shared by the students of a Jetson. Each student downloads their own models (Part 0b).
+## Every class
 
-**The student folder is the environment.** `~/myduino-jetson-lab/<class>/<student>/` holds the notebooks, the pictures, the engines, the AI models, and the Jupyter, IPython and shell settings of that student. Each student also has **their own JupyterLab port** (8801, 8802, ...), chosen once and kept in `.port`, so the port is the same in every session. Type `exit` in the SSH terminal when you finish. Updating this folder never changes the answers, and other students cannot overwrite your work by accident. `lab reset 4` (in a JupyterLab Terminal tab) gives you a fresh copy of the Lab 4 notebook.
+1. Switch on the Jetsons (network cable or Wi-Fi) and plug in the cameras (up to 3 for each Jetson). Start the teacher page on your PC.
+2. On the teacher page: make a class, add the students' names, and for each student choose the **Jetson** and the **camera**.
+3. Tell each student their address and PIN: "Amira, awak masuk 192.168.0.234:8881, PIN 482913".
+4. After the course, **Remove** the students (it deletes their folders on the Jetson). Python and the installed packages stay.
 
-Other `lab` commands: `lab cameras` (which cameras are free), `lab me` (who you are).
+The teacher page shows: every Jetson (online or not, IP address, cameras and who uses them), every class with every student's address, PIN and state (running or not), and buttons to make a class, add students, change a PIN, and remove a student or a class. If a Jetson was off, the students on it start again by themselves when it comes back.
+
+## The student folder is the environment
+
+`~/myduino-jetson-lab/<class>/<student>/` on the Jetson holds the notebooks, pictures, engines, the AI models, and the Jupyter, IPython and shell settings of one student. Only the Python packages (`~/venvs/jetson`) are shared, because PyTorch is several GB. Each student has their own port (8881, 8882, ...), which stays the same. Students share one Linux account, so a student could delete another's folder by hand: this is a classroom, not a secure system.
 
 ## Course Flow
 
-| Lab | Title | Where you work |
-|---|---|---|
-| 0 | See It First: AI Vision Demo (with the one-time setup) | Jupyter notebook |
-| 1 | Introduction to Jetson Orin Nano Super (JetPack 6.2) | Jupyter notebook |
-| 2 | Ubuntu Linux Essentials (Part 1) | Jupyter notebook (and a Terminal tab for nano) |
-| 3 | Ubuntu Linux Essentials (Part 2) | Jupyter notebook |
-| 4 | Python on Jetson | Jupyter notebook |
-| 5 | NVIDIA CUDA with Python | Jupyter notebook |
-| 6 | Image Processing with OpenCV | Jupyter notebook |
-| 7 | AI Vision and Inference | Jupyter notebook |
-| 8 | Optimisation with TensorRT | Jupyter notebook |
-| 9 | Mini Project | Jupyter notebook |
+| Lab | Title |
+|---|---|
+| 0 | See It First: AI Vision Demo (with the one-time setup) |
+| 1 | Introduction to Jetson Orin Nano Super (JetPack 6.2) |
+| 2 | Ubuntu Linux Essentials (Part 1) |
+| 3 | Ubuntu Linux Essentials (Part 2) |
+| 4 | Python on Jetson |
+| 5 | NVIDIA CUDA with Python |
+| 6 | Image Processing with OpenCV |
+| 7 | AI Vision and Inference |
+| 8 | Optimisation with TensorRT |
+| 9 | Mini Project |
 
 ## Folders
 
-- `labs/`: the master notebooks of the labs (`labs/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Students work on copies in their own folder.
-- `lab.sh` and `labs/lib.sh`: the `lab` command (`lab start`, `lab cameras`, and the teacher commands). `labs/teacher.py` is the teacher web page.
+- `labs/`: the master notebooks of the labs (`labs/lab2_linux1/lab2_linux1.ipynb` and so on) and `start_here.ipynb`. Each student works on copies in their own folder.
+- `labs/teacher_server.py`: the teacher page (runs on the teacher PC). `setup-teacher.ps1` and `setup-teacher.sh` start it.
+- `labs/agent.py`: the lab agent (runs on each Jetson). `setup-lab.sh` installs it as a service (`myduino-lab-agent`).
 - `labs/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs/lab0_demo/demo.py`: the Lab 0 AI vision game.
-- `setup.sh`, `verify_setup.py`: the one-time setup of the Jetson (`setup.sh`) and the check used by Lab 0.
+- `lab.sh`, `labs/lib.sh`: the small `lab` command (`lab me`, `lab reset 4` in a JupyterLab Terminal tab; `lab cameras` and `lab check` for the teacher).
+- `verify_setup.py`: the check used by Lab 0.
+
+## Notes for the teacher
+
+- The Jetsons and the teacher PC must be on the same network and reach each other. Some school Wi-Fi blocks devices from talking to each other: use a switch or router with cables, or a Wi-Fi without client isolation. Give the teacher PC a fixed IP address, or the Jetsons lose it after a restart.
+- If the teacher PC is switched off, the running JupyterLabs continue, but you cannot change who is where.
+- Several students can share a Jetson (2 to 3 is the safe number). Give each of them a different camera. The camera labs (6, 7 Part D, 8 Part D, 9) and the timing tests (Lab 5 F, Lab 7 E, Lab 8 C and E) give the best results when only one student runs them at a time.
+- Each student builds their own TensorRT engines in Lab 8. Only one build runs at a time, because a build uses most of the 8 GB memory. The next student waits.
+- `sudo` in a notebook: the student types the password once in a hidden box (`labview.sudo_login()`). It stays in that notebook's memory only.
+- Anyone who has a student's address and PIN can run commands on that Jetson, and anyone who knows the teacher password can change the classes. Use a classroom network. Both pages use plain HTTP.
+- `lab check` on a Jetson shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history and lists the student folders.
 
 ## Starting Again
 
-If you break something, delete this folder and clone it again. Your own work is in `~/myduino-jetson-lab/<class>/<your name>`.
+If you break something on a Jetson, delete the course folder and clone it again, then run `setup-lab.sh` again. The student folders are in `~/myduino-jetson-lab` and are not touched.
 
 ## Status
 
-Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9.
-
-## For the Teacher
-
-Several students can use one Jetson at the same time (2 to 3 is the safe number), each from their own laptop over SSH. Different classes can use it in different sessions, and every class has its own folder.
-
-**Once per Jetson:** `bash setup.sh`, then one student (or you) runs Part 0 of the Lab 0 notebook.
-
-**Before a class:**
-
-```bash
-lab class add a                  # make the class (students cannot make one by mistake)
-lab teacher                      # the teacher web page (asks you to choose a teacher password the first time)
-lab cameras                      # the cameras that are plugged in (up to 3)
-```
-
-**What the student does** (the same every time):
-
-```bash
-ssh orin_nano@<address of the Jetson>     # on the laptop
-lab start siti class a camera 0           # on the Jetson: siti's folder in class a, camera 0, siti's JupyterLab
-```
-
-`lab start` prints a JupyterLab link for the student's laptop browser and gives a shell with the Python environment on and the prompt `(a/siti)`. Typing `exit` stops that student's JupyterLab and frees the camera.
-
-**The teacher page** (`lab teacher`, then open the address it prints, on port 8800): the cameras and who uses them, and for each class every student with their **port**, state (working or offline), camera, folder size, last use and a link to their JupyterLab. The teacher can make a class and stop a session whose connection was lost. It asks for the teacher password. Deleting stays in the terminal, where you type the name to confirm.
-
-**The same in the terminal:**
-
-```bash
-lab classes               # the table of classes: students, size, last used, how many are working now
-lab class a               # the students of class a: port, camera, size, last used, state
-lab stop a siti           # free the JupyterLab and camera of a student whose connection was lost
-lab clean a siti          # delete one student's folder (ask them to copy their work first)
-lab clean a               # delete the whole class
-lab check                 # reset the board for the next session
-```
-
-- Cameras are numbered 0, 1, 2 in the order they are found. A camera can be used by one student at a time. A student who asks for a camera that is taken gets a message.
-- Each student builds their own TensorRT engines in Lab 8. Only one build runs at a time, because a build uses most of the 8 GB memory. The next student waits.
-- `lab check` shows changes in the course folder and offers to undo them, sets the power mode to MAXN SUPER, clears the command history, shows the running students and lists the classes.
-- The camera labs (6, 7 Part D, 8 Part D, 9) and all the timing tests (Lab 5 F, Lab 7 E, Lab 8 C and E) give the best results when only one student runs them at a time.
-- `sudo` in a notebook: the student types the password once in a hidden box (`labview.sudo_login()`). It stays in that notebook's memory only.
-- Anyone who has a student's JupyterLab link, or the teacher password, can run commands on the Jetson. Use a classroom network. The teacher page is plain HTTP.
+Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9 (the earlier terminal version). The teacher page, the agent and the notebook flow were tested with stand-ins and have not run on real hardware yet.
