@@ -146,7 +146,7 @@ def student_env(home, cls, camera_device):
     env.update(
         # HOME is the student folder, so everything the programs write (settings, caches, history, temporary files)
         # lands in the student's own folder and nothing is left anywhere else on the Jetson.
-        HOME=home, TMPDIR=os.path.join(home, ".tmp"), PIP_NO_CACHE_DIR="1", LAB_ROOT=ROOT,
+        HOME=home, TMPDIR=os.path.join(home, ".tmp"), PIP_CACHE_DIR=os.path.join(ROOT, ".cache", "pip"), LAB_ROOT=ROOT,
         VIRTUAL_ENV=venv, PATH=os.path.join(venv, "bin") + os.pathsep + env.get("PATH", ""),
         LAB_HOME=home, LAB_CLASS=cls, HISTFILE=os.path.join(home, ".bash_history"),
         JUPYTER_CONFIG_DIR=os.path.join(home, ".jupyter", "config"), JUPYTER_DATA_DIR=os.path.join(home, ".jupyter", "data"),
@@ -159,7 +159,7 @@ def student_env(home, cls, camera_device):
         env["LAB_CAMERA"] = camera_device
     else:
         env.pop("LAB_CAMERA", None)
-    for key in ("TMPDIR", "JUPYTER_CONFIG_DIR", "JUPYTER_DATA_DIR", "JUPYTER_RUNTIME_DIR", "JUPYTERLAB_SETTINGS_DIR", "JUPYTERLAB_WORKSPACES_DIR", "YOLO_CONFIG_DIR", "MPLCONFIGDIR"):
+    for key in ("PIP_CACHE_DIR", "TMPDIR", "JUPYTER_CONFIG_DIR", "JUPYTER_DATA_DIR", "JUPYTER_RUNTIME_DIR", "JUPYTERLAB_SETTINGS_DIR", "JUPYTERLAB_WORKSPACES_DIR", "YOLO_CONFIG_DIR", "MPLCONFIGDIR"):
         os.makedirs(env[key], exist_ok=True)
     return env
 
