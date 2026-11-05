@@ -243,7 +243,7 @@ lab_start() {
   fi
   if [ -n "$name" ]; then choose_student "$name" || return 1; else ensure_student || return 1; fi
   if [ ! -f ~/venvs/jetson/bin/activate ]; then
-    echo "The course environment is missing. Run  bash $HERE/bootstrap.sh  first."; return 1
+    echo "The course environment is missing. Run  bash $HERE/setup.sh  first."; return 1
   fi
   SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""
   mkdir -p "$SHARE_DIR"; session_busy "$SESSION_NAME" && return 1

@@ -11,7 +11,7 @@ Once per Jetson (needs internet, takes about a minute):
 cd ~
 git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git
 cd Jetson-Orin-Nano-Super-Lab
-bash bootstrap.sh    # Python environment and JupyterLab only
+bash setup.sh        # Python environment and JupyterLab only
 ```
 
 No `git`? On GitHub press **Code, then Download ZIP**, extract it in your Home folder and rename the folder to `Jetson-Orin-Nano-Super-Lab`.
@@ -27,8 +27,6 @@ Use the same name every time, and the camera number your teacher gives you. It p
 Type `exit` in the SSH terminal when you finish. Your own copies are saved in your own folder, `~/students/<your name>`, so updating this folder never changes your answers and other students on the same Jetson cannot overwrite your work. `lab reset 4` (in a JupyterLab Terminal tab) gives you a fresh copy of the Lab 4 notebook.
 
 Other `lab` commands: `lab cameras` (which cameras are free), `lab me` (who you are).
-
-An all-in-one script is also there for a teacher who prefers it: `bash setup.sh` installs everything from the terminal (the same steps as Lab 0, Part 0).
 
 ## Course Flow
 
@@ -51,7 +49,7 @@ An all-in-one script is also there for a teacher who prefers it: `bash setup.sh`
 - `lab.sh` and `labs/lib.sh`: the `lab` command (`lab start`, `lab cameras`, and the teacher commands).
 - `labs/labview.py`: helpers for the notebooks (camera, live video, `sudo` login, one TensorRT build at a time).
 - `labs/lab0_demo/demo.py`: the Lab 0 AI vision game.
-- `bootstrap.sh`, `setup.sh`, `verify_setup.py`: the setup.
+- `setup.sh`, `verify_setup.py`: the one-time setup of the Jetson (`setup.sh`) and the check used by Lab 0.
 
 ## Starting Again
 
