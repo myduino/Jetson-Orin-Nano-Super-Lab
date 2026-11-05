@@ -207,7 +207,6 @@ session_cleanup() {
   [ -n "$SESSION_DONE" ] && return; SESSION_DONE=1
   [ -n "$STARTED_SERVER" ] && share_stop "$SESSION_NAME" > /dev/null
   cam_release_of "$SESSION_NAME"
-  [ -n "$SESSION_STREAM" ] && rm -f "${SHARE_DIR:?}/${SESSION_NAME:?}.stream"
   [ -n "$SESSION_RC" ] && rm -f "$SESSION_RC"
 }
 
@@ -226,7 +225,7 @@ lab_link() {
 
 # lab_start [NAME] [camera N] [LAB]
 lab_start() {
-  local name="" labn="" cam="" prev="" a first="Start_Here.ipynb" b dev rc ip stream
+  local name="" labn="" cam="" prev="" a first="Start_Here.ipynb" b dev rc ip
   for a in "$@"; do
     if [ "$prev" = camera ]; then cam="$a"; prev=""; continue; fi
     case "$a" in
@@ -246,7 +245,7 @@ lab_start() {
   if [ ! -f ~/venvs/jetson/bin/activate ]; then
     echo "The course environment is missing. Run  bash $HERE/bootstrap.sh  first."; return 1
   fi
-  SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""; SESSION_STREAM=""
+  SESSION_NAME="$(basename "$LAB_HOME")"; SESSION_DONE=""; SESSION_RC=""; STARTED_SERVER=""
   mkdir -p "$SHARE_DIR"; session_busy "$SESSION_NAME" && return 1
   if [ -n "$cam" ]; then
     case "$cam" in *[!0-9]*) echo "The camera is a number, for example:  lab start $SESSION_NAME camera 0"; return 1 ;; esac
@@ -267,11 +266,8 @@ lab_start() {
     if [ -n "$b" ] && [ "$b" != "." ]; then first="lab$labn/$b"
     else echo "Lab $labn has no notebook yet. Opening Start_Here instead."; fi
   fi
-  stream=8800
-  while port_busy "$stream" || grep -qs "^$stream\$" "$SHARE_DIR"/*.stream; do stream=$((stream+1)); done
-  export LAB_STREAM_PORT="$stream" LAB_HOME
+  export LAB_HOME
   session_server "$SESSION_NAME" "$first" || { session_cleanup; return 1; }
-  echo "$stream" > "$SHARE_DIR/$SESSION_NAME.stream"; SESSION_STREAM=1
   ip="$(my_ip)"
   echo
   say "Hello, $SESSION_NAME!"
@@ -279,14 +275,13 @@ lab_start() {
   echo "  Your camera:     ${LAB_CAMERA:-none chosen}${cam:+  (camera $cam)}"
   echo "  Your JupyterLab: http://$ip:$SESSION_PORT/?token=$SESSION_TOKEN"
   echo "                   Open this link in the browser of your laptop."
-  echo "  Live programs:   http://$ip:$stream/   (the terminal programs print this link too)"
   echo "  When you finish: type  exit  . That stops your JupyterLab and frees the camera."
   echo
   rc="$(mktemp)"; SESSION_RC="$rc"
   cat > "$rc" <<RCEOF
 [ -f ~/.bashrc ] && source ~/.bashrc
 source ~/venvs/jetson/bin/activate
-export LAB_HOME="$LAB_HOME" LAB_STREAM_PORT="$stream" LAB_IN_SESSION=1
+export LAB_HOME="$LAB_HOME" LAB_IN_SESSION=1
 ${LAB_CAMERA:+export LAB_CAMERA="$LAB_CAMERA"}
 export PYTHONPATH="$HERE/labs\${PYTHONPATH:+:\$PYTHONPATH}"
 cd "$LAB_HOME"
@@ -367,7 +362,7 @@ share_stop() {
       pid="$(cat "$SHARE_DIR/$n.pid")"; pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
       echo "Stopped the JupyterLab of $n"
     fi
-    rm -f "${SHARE_DIR:?}/${n:?}".pid "${SHARE_DIR:?}/${n:?}".port "${SHARE_DIR:?}/${n:?}".token "${SHARE_DIR:?}/${n:?}".owner "${SHARE_DIR:?}/${n:?}".stream
+    rm -f "${SHARE_DIR:?}/${n:?}".pid "${SHARE_DIR:?}/${n:?}".port "${SHARE_DIR:?}/${n:?}".token "${SHARE_DIR:?}/${n:?}".owner
   done
 }
 
