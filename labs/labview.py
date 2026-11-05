@@ -5,11 +5,13 @@ Viewer         live picture for programs you run in the terminal:
                a window on the Jetson screen, or a page in your laptop browser when you work over SSH
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
+build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
 """
 import atexit
 import getpass
 import os
 import select
+import shutil
 import socket
 import stat
 import subprocess
@@ -237,6 +239,38 @@ def sudo_login():
     else:
         os.environ.pop("LAB_SUDO_PW", None)
         print("That password was not accepted. Run this cell again.")
+
+
+# ---------------------------------------------------------------- one build at a time
+class build_lock:
+    """with build_lock():  ...   Building a TensorRT engine uses most of the memory, so students take turns."""
+    path = os.path.expanduser("~/.lab_build.lock")
+
+    def __enter__(self):
+        shown = False
+        while True:
+            try:
+                os.mkdir(self.path)
+                break
+            except FileExistsError:
+                try:
+                    owner = open(os.path.join(self.path, "owner")).read().split()
+                    pid = int(owner[-1])
+                    os.kill(pid, 0)                       # still alive?
+                except (OSError, ValueError, IndexError):
+                    shutil.rmtree(self.path, ignore_errors=True)   # left behind by a closed session
+                    continue
+                if not shown:
+                    print(f"{owner[0]} is building an engine now. Only one build at a time fits in the 8 GB memory, "
+                          "so you wait here.", flush=True)
+                    shown = True
+                time.sleep(10)
+        with open(os.path.join(self.path, "owner"), "w") as f:
+            f.write(f"{os.path.basename(os.environ.get('LAB_HOME', 'student'))} {os.getpid()}\n")
+        return self
+
+    def __exit__(self, *exc):
+        shutil.rmtree(self.path, ignore_errors=True)
 
 
 # ---------------------------------------------------------------- notebooks
