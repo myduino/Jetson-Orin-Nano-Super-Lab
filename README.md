@@ -20,7 +20,7 @@ The teacher puts each student on a Jetson and a camera, on the teacher page. The
 - Windows: `myduino-jetson-lab.exe` (double-click; no install). If Windows asks about the network, choose Allow. If SmartScreen warns, choose More info, then Run anyway.
 - Mac with Apple chip (M1 or newer): `myduino-jetson-lab-mac-arm64.dmg`. Intel Mac: `myduino-jetson-lab-mac-x64.dmg`. Open it and drag the app to Applications. The first time, right-click the app, choose Open, then Open again (the app is not signed).
 
-**2. Add each Jetson in the portal (no terminal on the Jetson).** Open the app: the window is the teacher portal, and the lab is open. Under **Jetsons**, type the Jetson's IP address, user name and password (find the IP on the Jetson with `hostname -I`) and click **Add**. Then click **SETUP**. The app connects over SSH, downloads the course folder (only the student part) to `~/Jetson-Orin-Nano-Super-Lab`, and runs `labs-setup.sh`, which installs JupyterLab and the lab agent (the agent starts by itself whenever the Jetson starts). The steps show live in the portal, and the Jetson turns **online** when it is done (a few minutes). The password is saved on the teacher PC so SETUP can be run again later (it updates the Jetson). The Jetson needs internet, the same network as the teacher PC, and SSH on (it is on by default).
+**2. Add each Jetson in the portal (no terminal on the Jetson).** Open the app: the window is the teacher portal. Under **Jetsons**, type the Jetson's IP address, user name and password (find the IP on the Jetson with `hostname -I`) and click **Add**. Then click **SETUP**. The app connects over SSH, downloads the course folder (only the student part) to `~/Jetson-Orin-Nano-Super-Lab`, and runs `labs-setup.sh`, which installs JupyterLab and the lab agent (the agent starts by itself whenever the Jetson starts). The steps show live in the portal, and the Jetson turns **online** when it is done (a few minutes). The password is saved on the teacher PC so SETUP can be run again later (it updates the Jetson). The Jetson needs internet, the same network as the teacher PC, and SSH on (it is on by default).
 
 By hand instead, on the Jetson: `git clone https://github.com/myduino/Jetson-Orin-Nano-Super-Lab.git ~/Jetson-Orin-Nano-Super-Lab && bash ~/Jetson-Orin-Nano-Super-Lab/labs-setup.sh <teacher PC address:8800> <class key> jetson_01` (the app window shows the class key).
 
@@ -28,11 +28,12 @@ By hand instead, on the Jetson: `git clone https://github.com/myduino/Jetson-Ori
 
 ## Every class
 
-1. Switch on the Jetsons (network cable or Wi-Fi) and plug in the cameras (up to 3 for each Jetson). Double-click **Myduino Jetson Lab** on your PC. The window is the teacher portal, and the Jetsons start the student sessions.
-2. On the teacher page: make a class, add the students' names, and for each student choose the **Jetson** and the **camera**.
-3. Tell each student their address and PIN: "Amira, awak masuk 192.168.0.234:8881, PIN 482913".
-4. When the class ends, ask the students to save, then close the app window (the X). It asks to end the lab; when you confirm, every student session on every Jetson stops and students cannot open Jupyter. Their files stay. The next class starts again when you open the app.
-5. After the course, **Remove** the students (it deletes their folders on the Jetson). Python and the installed packages stay.
+1. Switch on the Jetsons (network cable or Wi-Fi) and plug in the cameras (up to 3 for each Jetson). Double-click **Myduino Jetson Lab** on your PC. The window is the teacher portal.
+2. Once, in the **Students** tab: make a class, add the students' names, and for each student choose the **Jetson** and the **camera**.
+3. Each time before the class: open the portal, go to **Students**, open the class tab and click **Start Lab**. The Jetsons start the Jupyter of that class's students, and each Jetson card shows who uses it.
+4. Tell each student their address and PIN: "Amira, awak masuk 192.168.0.234:8881, PIN 482913".
+5. When the class ends, ask the students to save and click **End Lab** on the class tab (or close the app window with the X, which asks to end every running class). The student sessions stop and students cannot open Jupyter. Their files stay. Another class can then use the same Jetsons and cameras.
+6. After the course, **Remove** the students (it deletes their folders on the Jetson). Python and the installed packages stay.
 
 The teacher page shows: every Jetson (online or not, IP address, cameras and who uses them), every class with every student's address, PIN and state (running or not), and buttons to make a class, add students, change a PIN, and remove a student or a class. If a Jetson was off, the students on it start again by themselves when it comes back.
 
