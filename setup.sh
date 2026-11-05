@@ -25,8 +25,8 @@ SITE="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 echo 'import warnings; warnings.filterwarnings("ignore", message="The value of the smallest subnormal")' > "$SITE/myduino_quiet.pth"
 # The lab notebooks import labview (camera, live video, sudo). This makes it available everywhere in the environment.
 echo "$HERE/labs" > "$SITE/myduino_labs.pth"
-mkdir -p ~/students/_shared/models ~/students/_shared/engines
+mkdir -p ~/myduino-jetson-lab
 
 echo
-echo "Setup finished. Open a NEW terminal and type:   lab start yourname camera 0"
+echo "Setup finished. Open a NEW terminal and type:   lab start yourname class yourclass camera 0"
 echo "Then open the link in your browser and follow the Lab 0 notebook to finish the setup."

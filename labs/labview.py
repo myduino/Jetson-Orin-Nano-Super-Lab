@@ -1,6 +1,6 @@
 """Camera and live-view helpers for the Myduino labs.
 
-open_camera()  opens the camera you chose with   lab start <name> camera <number>
+open_camera()  opens the camera you chose with   lab start <name> class <class> camera <number>
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
@@ -133,11 +133,16 @@ def setup_begin():
 
 
 def setup_end():
-    """Let the next student install (safe to run when you do not hold the lock)."""
+    """Let the next student install. Works after a kernel restart too: it looks at the lock file, not at memory."""
     global _setup
-    if _setup is not None:
-        _setup.__exit__()
-        _setup = None
+    lock = os.path.expanduser("~/.lab_setup.lock")
+    me = f"{os.path.basename(os.environ.get('LAB_HOME', 'student'))} {os.getppid()}"
+    try:
+        if open(os.path.join(lock, "owner")).read().split() == me.split():
+            shutil.rmtree(lock, ignore_errors=True)
+    except OSError:
+        pass
+    _setup = None
     print("Setup lock released.")
 
 
