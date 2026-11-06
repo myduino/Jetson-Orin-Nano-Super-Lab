@@ -358,7 +358,7 @@ def progress_report():
 def hello(cfg):
     global progress_at, progress_last
     host, _, _ = cfg["teacher"].partition(":")
-    if time.time() - progress_at > 20:                                 # notebooks are read every 20 seconds, not every 5
+    if time.time() - progress_at > 9:                                # notebooks are read every 10 seconds, not every 5
         progress_at, progress_last = time.time(), progress_report()
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
