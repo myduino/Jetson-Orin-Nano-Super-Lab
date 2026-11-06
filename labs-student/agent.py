@@ -123,6 +123,12 @@ def prepare(home):
         os.makedirs(os.path.join(home, f"lab{n}"), exist_ok=True)
     for d in ("models", ".jupyter", ".ipython", ".config", ".tmp"):
         os.makedirs(os.path.join(home, d), exist_ok=True)
+    # JupyterLab saves the open notebook every 20 seconds, so the teacher's Progress tab is never far behind (the default is 2 minutes).
+    dm = os.path.join(home, ".jupyter", "settings", "@jupyterlab", "docmanager-extension")
+    os.makedirs(dm, exist_ok=True)
+    if not os.path.exists(os.path.join(dm, "plugin.jupyterlab-settings")):          # a setting the student made is kept
+        with open(os.path.join(dm, "plugin.jupyterlab-settings"), "w") as f:
+            json.dump({"autosaveInterval": 20}, f)
     # The student's own bash: the Terminal tab of their JupyterLab starts in their folder, with their environment on.
     rc = os.path.join(home, ".bashrc")
     if "# myduino-lab" not in read(rc):
