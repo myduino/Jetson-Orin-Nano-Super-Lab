@@ -299,13 +299,65 @@ def reconcile(plan):
                 log("cannot start", key, error)
 
 
+# ---------------------------------------------------------------- progress: read from the students' saved notebooks
+progress_at, progress_last = 0, {}
+progress_cache = {}     # notebook path -> (mtime, done, total, errors)
+
+
+def notebook_progress(path):
+    try:
+        mtime = os.path.getmtime(path)
+        hit = progress_cache.get(path)
+        if hit and hit[0] == mtime:
+            return hit
+        done = total = errors = 0
+        for c in json.load(open(path)).get("cells", []):
+            if c.get("cell_type") != "code" or not "".join(c.get("source", [])).strip():
+                continue
+            total += 1
+            if c.get("execution_count") is not None:
+                done += 1
+            if any(o.get("output_type") == "error" for o in c.get("outputs", [])):
+                errors += 1
+        progress_cache[path] = hit = (mtime, done, total, errors)
+        return hit
+    except (OSError, ValueError):
+        return None
+
+
+def progress_report():
+    out = {}
+    try:
+        classes = [c for c in os.listdir(ROOT) if NAME.match(c) and os.path.isdir(os.path.join(ROOT, c))]
+    except OSError:
+        return out
+    for cls in classes:
+        for stu in os.listdir(os.path.join(ROOT, cls)):
+            home = os.path.join(ROOT, cls, stu)
+            if not NAME.match(stu) or not os.path.isdir(home):
+                continue
+            labs, last = {}, 0
+            for n in range(10):
+                for f in glob.glob(os.path.join(home, f"lab{n}", "*.ipynb")):
+                    p = notebook_progress(f)
+                    if p and p[2]:
+                        labs[str(n)] = [p[1], p[2], p[3]]
+                        if p[1]:
+                            last = max(last, p[0])
+            out[f"{cls}__{stu}"] = {"labs": labs, "idle": int(time.time() - last) if last else None}
+    return out
+
+
 # ---------------------------------------------------------------- talking to the teacher server
 def hello(cfg):
+    global progress_at, progress_last
     host, _, _ = cfg["teacher"].partition(":")
+    if time.time() - progress_at > 20:                                 # notebooks are read every 20 seconds, not every 5
+        progress_at, progress_last = time.time(), progress_report()
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
+        "progress": progress_last, "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
         "note": next(iter(m for _, m in failed.values()), "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
