@@ -8,6 +8,7 @@ their folder (.venv), made by the agent the first time. Only the Python standard
 
     python3 labs-student/agent.py            (the service does this)
 """
+import base64
 import glob
 import json
 import os
@@ -331,6 +332,33 @@ def notebook_progress(path):
         return None
 
 
+live_sent = {}        # key -> modified time of the last live picture sent
+
+
+def live_report():
+    """Small pictures of the students' running camera views (labview writes .tmp/live.jpg about every 1.5 seconds)."""
+    out = {}
+    for key in list(running)[:8]:
+        cls, _, stu = key.partition("__")
+        path = os.path.join(ROOT, cls, stu, ".tmp", "live.jpg")
+        try:
+            mtime = os.stat(path).st_mtime
+            if time.time() - mtime > 8:
+                live_sent.pop(key, None)
+                continue
+            if live_sent.get(key) == mtime:
+                out[key] = ""                                  # same picture as before: the teacher keeps the one it has
+                continue
+            with open(path, "rb") as f:
+                data = f.read()
+            if len(data) < 60000:
+                out[key] = base64.b64encode(data).decode()
+                live_sent[key] = mtime
+        except OSError:
+            live_sent.pop(key, None)
+    return out
+
+
 def progress_report():
     out = {}
     try:
@@ -363,7 +391,7 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "progress": progress_last, "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
+        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
         "note": next(iter(m for _, m in failed.values()), "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),

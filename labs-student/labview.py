@@ -180,6 +180,7 @@ class LiveView:
         self._thread = None
         self._last = None
         self._saved = 0
+        self._shared = 0
 
     def start(self):
         import ipywidgets as widgets
@@ -226,6 +227,23 @@ class LiveView:
         cv2.imwrite(name, self._last)
         self._status.value = f"Saved {name}"
 
+    def _share(self, picture):
+        """Keep a small picture of the live view for the teacher page (the agent sends it; it is deleted when the camera stops)."""
+        home = os.environ.get("LAB_HOME")
+        if not home or time.time() - self._shared < 1.5:
+            return
+        self._shared = time.time()
+        try:
+            h, w = picture.shape[:2]
+            ok, buf = cv2.imencode(".jpg", cv2.resize(picture, (320, max(1, int(h * 320 / w)))), [cv2.IMWRITE_JPEG_QUALITY, 60])
+            if ok:
+                path = os.path.join(home, ".tmp", "live.jpg")
+                with open(path + ".part", "wb") as f:
+                    f.write(buf.tobytes())
+                os.replace(path + ".part", path)
+        except Exception:
+            pass                                   # the teacher picture is optional: never disturb the student's live view
+
     def _run(self):
         try:
             cap = open_camera(self.size, self.mjpg)
@@ -245,6 +263,7 @@ class LiveView:
                 self.state["fps"] = 0.9 * self.state["fps"] + 0.1 * (1.0 / max(now - last, 1e-6))
                 last = now
                 self._last = shown
+                self._share(shown)
                 ok, buf = cv2.imencode(".jpg", shown, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if ok:
                     self._img.value = buf.tobytes()
@@ -252,6 +271,10 @@ class LiveView:
             self._status.value = f"Stopped by an error: {error}"
         finally:
             cap.release()
+            try:
+                os.remove(os.path.join(os.environ.get("LAB_HOME", ""), ".tmp", "live.jpg"))
+            except OSError:
+                pass
             if not self._status.value.startswith("Stopped by"):
                 self._status.value = "Stopped. The camera is free."
             if LiveView._active is self:
