@@ -5,6 +5,7 @@ mqtt()         connects this notebook to the MQTT broker of your own (ESP32 boar
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 record()       record sound from the microphone (webcam or USB); play() plays it; MicStream() listens all the time
+ollama_chat()  ask the language model that runs on this Jetson (Ollama); ollama_models(), ollama_pull()
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
 train_lock()   one model training at a time (shares the lock of build_lock)
 setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets the next one in)
@@ -219,6 +220,80 @@ def play(sound, rate=16000, browser=True, speaker=True):
             subprocess.run(["aplay", "-q"] + ([] if dev == "default" else ["-D", dev]) + [path], capture_output=True, timeout=120)
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+
+
+# ---------------------------------------------------------------- language models (Ollama runs on this Jetson)
+OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
+
+
+def _ollama(path, body=None, timeout=600):
+    """Send one request to the Ollama server of this Jetson. Returns the open answer (read it line by line)."""
+    import json
+    import urllib.error
+    import urllib.request
+    request = urllib.request.Request(OLLAMA + path, data=None if body is None else json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        return urllib.request.urlopen(request, timeout=timeout)
+    except urllib.error.URLError as error:
+        raise SystemExit(f"Cannot reach Ollama at {OLLAMA} ({error.reason}). Is it installed and running? "
+                         "See Part A of the lab (ollama --version, sudo systemctl status ollama).")
+
+
+def ollama_models():
+    """The names of the language models that are downloaded on this Jetson."""
+    import json
+    with _ollama("/api/tags", timeout=10) as answer:
+        return [m["name"] for m in json.load(answer).get("models", [])]
+
+
+def ollama_pull(model, show=print):
+    """Download a model (only the first student needs to). Shows the progress every 10 %."""
+    import json
+    last = None
+    with _ollama("/api/pull", {"name": model, "stream": True}, timeout=3600) as answer:
+        for line in answer:
+            info = json.loads(line)
+            if info.get("error"):
+                raise SystemExit("Download failed: " + info["error"])
+            status, total = info.get("status", ""), info.get("total")
+            step = int(10 * info.get("completed", 0) / total) if total else None
+            if (status, step) != last:
+                last = (status, step)
+                show(status + (f" {10 * step} %" if total else ""))
+
+
+def ollama_chat(messages, model="llama3.2:1b", options=None, images=None, on_token=None, keep_alive="10m"):
+    """Ask the language model. messages is a list like [{"role": "user", "content": "Hello"}].
+    images (optional): a list of JPEG pictures as bytes, for a vision model. on_token(text) is called for every piece of the answer.
+    Returns a dict: text, first_token_s (time to the first word), tokens, tokens_per_s, total_s."""
+    import base64
+    import json
+    messages = [dict(m) for m in messages]
+    if images:
+        messages[-1]["images"] = [base64.b64encode(i).decode() for i in images]
+    body = {"model": model, "messages": messages, "stream": True, "keep_alive": keep_alive,
+            "options": {"num_ctx": 2048, "temperature": 0.7, **(options or {})}}
+    started = time.time()
+    first, text, final = None, "", {}
+    with _ollama("/api/chat", body) as answer:
+        for line in answer:
+            info = json.loads(line)
+            if info.get("error"):
+                raise SystemExit("The model says: " + info["error"] + " (is the model downloaded? ollama_models() shows the list)")
+            piece = info.get("message", {}).get("content", "")
+            if piece:
+                if first is None:
+                    first = time.time() - started
+                text += piece
+                if on_token:
+                    on_token(piece)
+            if info.get("done"):
+                final = info
+    tokens = final.get("eval_count", 0)
+    seconds = final.get("eval_duration", 0) / 1e9
+    return {"text": text.strip(), "first_token_s": first or 0.0, "tokens": tokens,
+            "tokens_per_s": tokens / seconds if seconds else 0.0, "total_s": time.time() - started}
 
 
 # ---------------------------------------------------------------- sudo in notebooks
