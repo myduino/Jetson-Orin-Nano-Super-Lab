@@ -99,7 +99,7 @@ def make_venv(key, home):
             shutil.rmtree(venv, ignore_errors=True)
             run("/usr/bin/python3", "-m", "venv", "--system-site-packages", venv)
             run(os.path.join(venv, "bin", "pip"), "install", "--upgrade", "pip")
-            run(os.path.join(venv, "bin", "pip"), "install", "numpy<2", "jupyterlab", "ipywidgets", "openpyxl")
+            run(os.path.join(venv, "bin", "pip"), "install", "numpy<2", "jupyterlab", "ipywidgets", "openpyxl", "paho-mqtt")
             site = subprocess.run([os.path.join(venv, "bin", "python"), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
                                   capture_output=True, text=True, check=True, env=env).stdout.strip()
             # OpenCV on the Jetson makes NumPy print a harmless warning: hide only that one message.
@@ -157,7 +157,7 @@ def prepare(home):
                     shutil.copyfile(os.path.join(labs, folder, f), dest)
 
 
-def student_env(home, cls, camera_device):
+def student_env(home, cls, camera_device, pin=None):
     env = dict(os.environ)
     venv = venv_of(home)
     env.update(
@@ -173,6 +173,10 @@ def student_env(home, cls, camera_device):
         YOLO_CONFIG_DIR=os.path.join(home, ".config", "Ultralytics"), MPLCONFIGDIR=os.path.join(home, ".config", "matplotlib"),
     )
     env.pop("PYTHONHOME", None)
+    if pin is not None:                                    # the student's MQTT account on this Jetson (see the MQTT broker section)
+        student = os.path.basename(home)
+        env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(MQTT_PORT), LAB_MQTT_USER=f"{cls}__{student}", LAB_MQTT_PASS=str(pin),
+                   LAB_MQTT_PREFIX=f"{cls}/{student}/")
     if camera_device:
         env["LAB_CAMERA"] = camera_device
     else:
@@ -191,7 +195,7 @@ def start(cls, student, port, pin, camera):
     proc = subprocess.Popen(
         [os.path.join(venv_of(home), "bin", "jupyter"), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
          f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", "Start_Here.ipynb"],
-        cwd=home, env=student_env(home, cls, device), stdout=out, stderr=out, start_new_session=True)
+        cwd=home, env=student_env(home, cls, device, pin), stdout=out, stderr=out, start_new_session=True)
     running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time()}
 
 
@@ -306,6 +310,63 @@ def reconcile(plan):
                 log("cannot start", key, error)
 
 
+# ---------------------------------------------------------------- MQTT broker (for the ESP32 labs and phone apps)
+MQTT_PORT = 1883
+MQTT_DIR = os.path.join(ROOT, ".mqtt")
+MQTT_HOST = [""]                  # the address of this Jetson as the teacher sees it (set by hello)
+broker = {"proc": None, "users": None}
+
+
+def mqtt_ready():
+    return bool(shutil.which("mosquitto") and shutil.which("mosquitto_passwd"))
+
+
+def mqtt_stop():
+    p, broker["proc"], broker["users"] = broker["proc"], None, None
+    if p and p.poll() is None:
+        p.terminate()
+        try:
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+
+def mqtt_sync(plan):
+    """One MQTT account per student whose lab is running: user class__student, password = the PIN, and only the topics class/student/#.
+    The broker is a program of the agent (no sudo needed): it starts with the first student and stops with the last."""
+    users = {}
+    for p in plan:
+        if NAME.match(str(p.get("class", ""))) and NAME.match(str(p.get("student", ""))):
+            users[f"{p['class']}__{p['student']}"] = (str(p["pin"]), f"{p['class']}/{p['student']}")
+    if not users:
+        return mqtt_stop()
+    if not mqtt_ready():
+        return
+    alive = broker["proc"] is not None and broker["proc"].poll() is None
+    if alive and broker["users"] == users:
+        return
+    os.makedirs(MQTT_DIR, exist_ok=True)
+    passwd, acl, conf = (os.path.join(MQTT_DIR, n) for n in ("passwd", "acl", "mosquitto.conf"))
+    first = True
+    for user, (pin, _) in users.items():
+        subprocess.run(["mosquitto_passwd"] + (["-c"] if first else []) + ["-b", passwd, user, pin], check=True, capture_output=True)
+        first = False
+    with open(acl, "w") as f:
+        for user, (_, prefix) in users.items():
+            f.write(f"user {user}\ntopic readwrite {prefix}/#\n\n")
+    with open(conf, "w") as f:
+        f.write(f"listener {MQTT_PORT} 0.0.0.0\nallow_anonymous false\npassword_file {passwd}\nacl_file {acl}\npersistence false\n")
+    for f in (passwd, acl, conf):
+        os.chmod(f, 0o600)
+    if alive:
+        broker["proc"].send_signal(signal.SIGHUP)                              # the broker reads the new users and rules
+    else:
+        broker["proc"] = subprocess.Popen(["mosquitto", "-c", conf], stdout=open(os.path.join(MQTT_DIR, "mosquitto.log"), "ab"),
+                                          stderr=subprocess.STDOUT, start_new_session=True)
+        log("MQTT broker started on port", MQTT_PORT)
+    broker["users"] = users
+
+
 # ---------------------------------------------------------------- progress: read from the students' saved notebooks
 progress_at, progress_last = 0, {}
 progress_cache = {}     # notebook path -> (mtime, done, total, errors)
@@ -386,13 +447,14 @@ def progress_report():
 def hello(cfg):
     global progress_at, progress_last
     host, _, _ = cfg["teacher"].partition(":")
+    MQTT_HOST[0] = my_ip(host)
     if time.time() - progress_at > 9:                                # notebooks are read every 10 seconds, not every 5
         progress_at, progress_last = time.time(), progress_report()
     body = {
-        "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": my_ip(host), "cameras": cameras(),
+        "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": MQTT_HOST[0], "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
         "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
-        "note": next(iter(m for _, m in failed.values()), "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
+        "note": next(iter(m for _, m in failed.values()), "") or ("MQTT is not installed on this Jetson. Click Set Up Again." if running and not mqtt_ready() else "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json", "X-Key": cfg["key"]})
@@ -422,6 +484,7 @@ def main():
                 for d in answer.get("delete", []):
                     delete_folder(str(d.get("class", "")), str(d.get("student", "")))
                 reconcile(answer.get("plan", []))
+                mqtt_sync(answer.get("plan", []))
                 shown = ""
             except (urllib.error.URLError, OSError, ValueError) as error:
                 if str(error) != shown:                                      # say it once, not every 5 seconds
@@ -431,10 +494,12 @@ def main():
                     log("no news from the teacher for", GRACE // 60, "minutes: stopping all student sessions")
                     for key in list(running):
                         stop(key)
+                    mqtt_stop()
             time.sleep(EVERY)
     finally:
         for key in list(running):
             stop(key)
+        mqtt_stop()
 
 
 if __name__ == "__main__":

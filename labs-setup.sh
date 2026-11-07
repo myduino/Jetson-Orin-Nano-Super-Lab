@@ -19,7 +19,9 @@ NAME="$(printf '%s' "$NAME" | tr 'A-Z-' 'a-z_' | sed 's/[^a-z0-9_]/_/g' | cut -c
 echo "== Myduino Jetson Orin Nano Super Lab: setup of this Jetson =="
 echo "== 1. Python tools =="
 sudo apt update
-sudo apt install -y python3-venv python3-pip git curl
+sudo apt install -y python3-venv python3-pip git curl mosquitto mosquitto-clients
+# The agent runs its own MQTT broker for the students (ESP32 labs, phone apps): the one of the system must not take the port.
+sudo systemctl disable --now mosquitto > /dev/null 2>&1 || true
 
 echo "== 2. The lab folder =="
 # Only two folders of the lab live in the home folder: this one, and ~/myduino-jetson-lab (the students and the settings).

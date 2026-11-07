@@ -1,6 +1,7 @@
 """Camera and live-view helpers for the Myduino labs.
 
 open_camera()  opens the camera your teacher chose for you on the teacher page
+mqtt()         connects this notebook to the MQTT broker of the Jetson (ESP32 boards and phone apps use it too)
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
@@ -16,6 +17,45 @@ import threading
 import time
 
 import cv2
+
+
+# ---------------------------------------------------------------- MQTT (ESP32 boards, phone apps)
+def mqtt_info():
+    """Your MQTT account on this Jetson. Give host, port, user and password to the ESP32 and to a phone app (IoT MQTT Panel).
+    You may only use topics that start with prefix: your teacher's page and this Jetson keep every student's topics apart."""
+    env = os.environ
+    return {"host": env.get("LAB_MQTT_HOST", ""), "port": int(env.get("LAB_MQTT_PORT", "1883")), "user": env.get("LAB_MQTT_USER", ""),
+            "password": env.get("LAB_MQTT_PASS", ""), "prefix": env.get("LAB_MQTT_PREFIX", "")}
+
+
+def mqtt_topic(name):
+    """A topic of yours: mqtt_topic("gate") -> "dka_4/aminah/gate"."""
+    return mqtt_info()["prefix"] + name.lstrip("/")
+
+
+def mqtt(on_message=None, subscribe=()):
+    """Connect this notebook to the MQTT broker of this Jetson and return the client.
+    on_message(topic, text) is called for every message on the topics in subscribe (names such as "temperature", or "#" for all of yours)."""
+    try:
+        import paho.mqtt.client as paho
+    except ImportError:
+        subprocess.run(["pip", "install", "-q", "paho-mqtt"], check=True)
+        import paho.mqtt.client as paho
+    info = mqtt_info()
+    if not info["user"]:
+        raise SystemExit("No MQTT account. Ask your teacher to start the lab, then restart this notebook's kernel.")
+    try:
+        client = paho.Client(paho.CallbackAPIVersion.VERSION2, client_id=f"{info['user']}-nb-{os.getpid()}")
+    except AttributeError:                                    # an older paho-mqtt
+        client = paho.Client(client_id=f"{info['user']}-nb-{os.getpid()}")
+    client.username_pw_set(info["user"], info["password"])
+    if on_message:
+        client.on_message = lambda c, u, m: on_message(m.topic, m.payload.decode(errors="replace"))
+    client.connect("127.0.0.1", info["port"], keepalive=30)          # the broker runs on this Jetson
+    for name in ([subscribe] if isinstance(subscribe, str) else subscribe):
+        client.subscribe(mqtt_topic(name))
+    client.loop_start()
+    return client
 
 
 # ---------------------------------------------------------------- camera
