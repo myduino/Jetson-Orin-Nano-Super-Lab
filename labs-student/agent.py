@@ -29,6 +29,7 @@ ROOT = os.path.join(HOME, "myduino-jetson-lab")                          # every
 CONFIG = os.environ.get("LAB_AGENT_CONFIG", os.path.join(ROOT, ".agent.json"))
 SYSFS = os.environ.get("LAB_SYSFS", "/sys/class/video4linux")
 DEV = os.environ.get("LAB_DEV", "/dev")
+MAX_LABS = 30                                                                     # lab0 ... lab29 folders in each student's folder
 NAME = re.compile(r"^[a-z0-9_]{1,20}$")
 GRACE = 15 * 60                                                         # seconds without the teacher before every student session is closed
 EVERY = 5                                                               # seconds between two reports
@@ -120,7 +121,7 @@ def make_venv(key, home):
 
 # ---------------------------------------------------------------- a student's folder and JupyterLab
 def prepare(home):
-    for n in range(10):
+    for n in range(MAX_LABS):
         os.makedirs(os.path.join(home, f"lab{n}"), exist_ok=True)
     for d in ("models", ".jupyter", ".ipython", ".config", ".tmp"):
         os.makedirs(os.path.join(home, d), exist_ok=True)
@@ -147,7 +148,7 @@ def prepare(home):
     shutil.copyfile(os.path.join(HERE, "labs-student", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
     labs = os.path.join(HERE, "labs-student")
     for folder in sorted(os.listdir(labs)):
-        m = re.match(r"lab(\d)_", folder)
+        m = re.match(r"lab(\d{1,2})_", folder)
         if not m or not os.path.isdir(os.path.join(labs, folder)):
             continue
         for f in os.listdir(os.path.join(labs, folder)):
@@ -157,7 +158,7 @@ def prepare(home):
                     shutil.copyfile(os.path.join(labs, folder, f), dest)
 
 
-def student_env(home, cls, camera_device, pin=None, mqtt_port=None):
+def student_env(home, cls, camera_device, pin=None, mqtt_port=None, lab=None):
     env = dict(os.environ)
     venv = venv_of(home)
     env.update(
@@ -173,6 +174,9 @@ def student_env(home, cls, camera_device, pin=None, mqtt_port=None):
         YOLO_CONFIG_DIR=os.path.join(home, ".config", "Ultralytics"), MPLCONFIGDIR=os.path.join(home, ".config", "matplotlib"),
     )
     env.pop("PYTHONHOME", None)
+    if lab is not None:                                    # each lab keeps its own JupyterLab layout (the open tabs of the lab before do not come back)
+        env["JUPYTERLAB_WORKSPACES_DIR"] = os.path.join(home, ".jupyter", "workspaces", f"lab{lab}")
+        os.makedirs(env["JUPYTERLAB_WORKSPACES_DIR"], exist_ok=True)
     if pin is not None and mqtt_port:                      # the student's own MQTT broker (see the MQTT section)
         env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(mqtt_port), LAB_MQTT_USER=os.path.basename(home), LAB_MQTT_PASS=str(pin))
     if camera_device:
@@ -184,18 +188,24 @@ def student_env(home, cls, camera_device, pin=None, mqtt_port=None):
     return env
 
 
-def start(cls, student, port, pin, camera, mqtt_port=None):
+def start(cls, student, port, pin, camera, mqtt_port=None, lab=None):
     home = os.path.join(ROOT, cls, student)
     prepare(home)
     mqtt_port = mqtt_port or int(port) - 7000
     device = next((c["device"] for c in cameras() if c["number"] == camera), "") if camera is not None else ""
-    log("start", f"{cls}/{student}", "port", port, "camera", camera if camera is not None else "-")
+    # The teacher started one lab: JupyterLab shows only that lab's folder and opens its notebook. Without a lab it shows the whole folder (old way).
+    root, first = home, "Start_Here.ipynb"
+    if lab is not None and os.path.isdir(os.path.join(home, f"lab{lab}")):
+        root = os.path.join(home, f"lab{lab}")
+        books = sorted(f for f in os.listdir(root) if f.endswith(".ipynb"))
+        first = books[0] if books else ""
+    log("start", f"{cls}/{student}", "port", port, "lab", lab if lab is not None else "-", "camera", camera if camera is not None else "-")
     out = open(os.path.join(home, ".jupyter", "server.log"), "ab")
     proc = subprocess.Popen(
         [os.path.join(venv_of(home), "bin", "jupyter"), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
-         f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", "Start_Here.ipynb"],
-        cwd=home, env=student_env(home, cls, device, pin, mqtt_port), stdout=out, stderr=out, start_new_session=True)
-    running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time(),
+         f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", f"--ServerApp.root_dir={root}"] + ([first] if first else []),
+        cwd=root, env=student_env(home, cls, device, pin, mqtt_port, lab), stdout=out, stderr=out, start_new_session=True)
+    running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "lab": lab, "started": time.time(),
                                     "mqtt": mqtt_start(home, student, pin, mqtt_port), "mqtt_port": mqtt_port}
 
 
@@ -292,7 +302,7 @@ def reconcile(plan):
     for key in list(running):
         r = running[key]
         w = wanted.get(key)
-        if w is None or r["proc"].poll() is not None or (r["port"], r["pin"], r["camera"]) != (w["port"], str(w["pin"]), w.get("camera")):
+        if w is None or r["proc"].poll() is not None or (r["port"], r["pin"], r["camera"], r.get("lab")) != (w["port"], str(w["pin"]), w.get("camera"), w.get("lab")):
             gone = w is not None and r["proc"].poll() is not None
             stop(key)
             if gone and time.time() - r["started"] < 15:
@@ -310,7 +320,7 @@ def reconcile(plan):
             continue
         if key not in running and not w.get("_wait"):
             try:
-                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"), w.get("mqtt_port"))
+                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"), w.get("mqtt_port"), w.get("lab"))
             except OSError as error:
                 log("cannot start", key, error)
 
@@ -418,7 +428,7 @@ def progress_report():
             if not NAME.match(stu) or not os.path.isdir(home):
                 continue
             labs, last = {}, 0
-            for n in range(10):
+            for n in range(MAX_LABS):
                 for f in glob.glob(os.path.join(home, f"lab{n}", "*.ipynb")):
                     p = notebook_progress(f)
                     if p and p[2]:
