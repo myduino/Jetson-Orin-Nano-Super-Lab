@@ -5,7 +5,7 @@ and it reads a sensor. The two talk with MQTT through the broker on the Jetson.
 
 Topics:  esp/cmd/led      on | off | blink          esp/status     online | offline (retained, the last will)
          esp/cmd/buzzer   milliseconds              esp/telemetry  JSON every 5 seconds
-         esp/cmd/servo    angle 0 to 180            esp/sensor/light  the light level every 2 seconds
+         esp/cmd/servo    angle 0 to 180            esp/sensor/light  the light level every 2 seconds     esp/sensor/temp  the chip temperature every 2 seconds
          esp/cmd/alert    on | off                  esp/ack        "<command>=<value>" after every command
          jetson/hb        the heartbeat of the Jetson (every 5 seconds)    esp/event  messages of the board
 Fail-safe: if the alert is on and the heartbeat of the Jetson stops for 15 seconds, the board switches the alert off.
@@ -24,6 +24,15 @@ buzzer = Pin(config.PIN_BUZZER, Pin.OUT)
 servo = PWM(Pin(config.PIN_SERVO), freq=50)
 light = ADC(Pin(config.PIN_LIGHT))
 light.atten(ADC.ATTN_11DB)                      # read the full range 0 to 3.3 V
+
+try:
+    import esp32
+
+    def read_temp():
+        return round(esp32.mcu_temperature(), 1)             # the temperature of the chip (a warm board reads higher than the room)
+except (ImportError, AttributeError):
+    def read_temp():
+        return None
 
 state = {"led": "off", "alert": False, "buzzer_until": 0, "servo": 90, "hb": time.ticks_ms()}
 client = None
@@ -113,6 +122,9 @@ def run():
         if time.ticks_diff(now, last_sensor) > 2000:
             last_sensor = now
             say("esp/sensor/light", light.read())
+            temp = read_temp()
+            if temp is not None:
+                say("esp/sensor/temp", temp)
         if time.ticks_diff(now, last_telemetry) > 5000:
             last_telemetry = now
             say("esp/telemetry", json.dumps({"uptime_s": time.ticks_diff(now, started) // 1000, "rssi": wlan.status("rssi"),

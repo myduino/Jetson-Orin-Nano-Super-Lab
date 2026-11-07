@@ -151,6 +151,8 @@ class VirtualEsp32:
         self.led, self.alert, self.servo, self.buzzer_until = "off", False, 90, 0.0
         self.hb = time.time()
         self.light = 2000.0
+        self.temp = 30.0
+        self._offsets = {}                  # kind -> (amount, until): a made-up disturbance, see disturb()
         self.log = []
         self._stop = threading.Event()
         self.client = mqtt(self._on_message, subscribe=["esp/cmd/#", "jetson/hb"])
@@ -198,12 +200,22 @@ class VirtualEsp32:
             if now - last_sensor > 2:
                 last_sensor = now
                 self.light = min(4095, max(0, self.light + self._random.uniform(-60, 60)))
-                self._say("esp/sensor/light", int(self.light))
+                self.temp = min(45, max(25, self.temp + self._random.uniform(-0.3, 0.3)))
+                self._say("esp/sensor/light", int(self.light + self._offset("light", now)))
+                self._say("esp/sensor/temp", round(self.temp + self._offset("temp", now), 1))
             if now - last_telemetry > 5:
                 last_telemetry = now
                 import json
                 self._say("esp/telemetry", json.dumps({"uptime_s": int(now - self.started), "rssi": -55, "led": self.led,
                                                        "alert": self.alert, "servo": self.servo}))
+
+    def _offset(self, kind, now):
+        amount, until = self._offsets.get(kind, (0.0, 0.0))
+        return amount if now < until else 0.0
+
+    def disturb(self, kind="light", amount=1500.0, seconds=6.0):
+        """Make a made-up disturbance in a sensor (kind "light" or "temp") for some seconds, to test an alarm. Example: board.disturb("temp", 12, 8)."""
+        self._offsets[kind] = (amount, time.time() + seconds)
 
     def describe(self):
         """What the board does now, as text."""
