@@ -15,6 +15,7 @@ import getpass
 import os
 import shutil
 import stat
+import sys
 import subprocess
 import tempfile
 import threading
@@ -263,6 +264,47 @@ def _device_get(kind):
         return open(_device_file(kind)).read().strip() or "default"
     except OSError:
         return "default"
+
+
+def qr_picture(text, size=6):
+    """A QR code picture (grey, 0 = black, 255 = white, with a white border) for this text.
+    Uses OpenCV when it can make QR codes (OpenCV 4.5.4 on JetPack 6 cannot), otherwise the `qrcode` package."""
+    import numpy as np
+    if hasattr(cv2, "QRCodeEncoder"):
+        code = cv2.QRCodeEncoder.create().encode(text)
+    else:
+        try:
+            import qrcode
+        except ImportError:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "qrcode"], check=True)
+            import qrcode
+        maker = qrcode.QRCode(border=0, box_size=1)
+        maker.add_data(text)
+        maker.make(fit=True)
+        code = np.where(np.array(maker.get_matrix(), dtype=bool), 0, 255).astype("uint8")
+        code = cv2.copyMakeBorder(code, 4, 4, 4, 4, cv2.BORDER_CONSTANT, value=255)   # the quiet zone
+    code = cv2.resize(code, None, fx=size, fy=size, interpolation=cv2.INTER_NEAREST)
+    return cv2.copyMakeBorder(code, 30, 30, 30, 30, cv2.BORDER_CONSTANT, value=255)
+
+
+def read_qr(frame):
+    """All QR codes in a picture: a list of (text, corners), corners being 4 (x, y) points.
+    Uses pyzbar (it always decodes); the OpenCV detector of JetPack 6 can find a code but cannot read it."""
+    import numpy as np
+    try:
+        from pyzbar import pyzbar
+    except Exception:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyzbar"], check=False)    # needs libzbar0 (setup installs it)
+        try:
+            from pyzbar import pyzbar
+        except Exception:
+            pyzbar = None
+    if pyzbar is not None:
+        grey = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        return [(d.data.decode("utf-8", "replace"), np.array([[p.x, p.y] for p in d.polygon], dtype=int))
+                for d in pyzbar.decode(grey) if d.type == "QRCODE" and len(d.polygon) == 4]
+    found, texts, corners, _ = cv2.QRCodeDetector().detectAndDecodeMulti(frame)
+    return list(zip(texts, corners.astype(int))) if found else []
 
 
 def mic_get():
