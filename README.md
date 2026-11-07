@@ -87,4 +87,21 @@ If you break something on a Jetson, delete the course folder and clone it again,
 
 ## Status
 
+## The labs
+
+| Labs | Topic | Notes |
+|---|---|---|
+| 0 to 3 | Demo, the Jetson, Linux | |
+| 4 to 6 | Python, CUDA, OpenCV | |
+| 7 to 9 | AI vision, TensorRT, mini project | |
+| 10 to 15 | Tracking, pose, segmentation and zones, OCR and QR, your own model, deploy and alarm | Camera |
+| 16 to 18 | Speech to text, keyword spotting, text to speech | USB microphone (the webcam microphone works) and a speaker |
+| 19 to 21 | Local chatbot, ask the camera, voice assistant | Uses Ollama; Lab 19 installs it |
+| 22 to 24 | AIoT with the ESP32-S3 over MQTT, smart door, sensor streams and dashboard | The Jetson does the AI, the ESP32 does the IoT. A virtual ESP32 is built in, so the labs run before the board arrives. |
+| 25 | Capstone | |
+
+The program for the ESP32-S3 is in `labs-student/esp32/` (`main.py` and `config.py`). The pins in `config.py` are placeholders: change them to match your wiring.
+
 Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9 (the earlier terminal version). The teacher page, the agent and the notebook flow were tested with stand-ins and have not run on real hardware yet.
+
+The new Labs 10 to 25 have been tested only with simulations (a fake MQTT broker, a virtual ESP32, synthetic sounds and pictures). They have not yet run on the Jetson with a real microphone, an ESP32 board and the downloaded models.
