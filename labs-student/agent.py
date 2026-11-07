@@ -351,7 +351,7 @@ def live_report():
                 continue
             with open(path, "rb") as f:
                 data = f.read()
-            if len(data) < 60000:
+            if len(data) < 120000:
                 out[key] = base64.b64encode(data).decode()
                 live_sent[key] = mtime
         except OSError:
