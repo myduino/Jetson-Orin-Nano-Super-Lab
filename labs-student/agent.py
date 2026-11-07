@@ -157,7 +157,7 @@ def prepare(home):
                     shutil.copyfile(os.path.join(labs, folder, f), dest)
 
 
-def student_env(home, cls, camera_device, pin=None):
+def student_env(home, cls, camera_device, pin=None, mqtt_user=None):
     env = dict(os.environ)
     venv = venv_of(home)
     env.update(
@@ -175,7 +175,7 @@ def student_env(home, cls, camera_device, pin=None):
     env.pop("PYTHONHOME", None)
     if pin is not None:                                    # the student's MQTT account on this Jetson (see the MQTT broker section)
         student = os.path.basename(home)
-        env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(MQTT_PORT), LAB_MQTT_USER=f"{cls}__{student}", LAB_MQTT_PASS=str(pin),
+        env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(MQTT_PORT), LAB_MQTT_USER=mqtt_user or f"{cls}_{student}", LAB_MQTT_PASS=str(pin),
                    LAB_MQTT_PREFIX=f"{cls}/{student}/")
     if camera_device:
         env["LAB_CAMERA"] = camera_device
@@ -186,7 +186,7 @@ def student_env(home, cls, camera_device, pin=None):
     return env
 
 
-def start(cls, student, port, pin, camera):
+def start(cls, student, port, pin, camera, mqtt_user=None):
     home = os.path.join(ROOT, cls, student)
     prepare(home)
     device = next((c["device"] for c in cameras() if c["number"] == camera), "") if camera is not None else ""
@@ -195,7 +195,7 @@ def start(cls, student, port, pin, camera):
     proc = subprocess.Popen(
         [os.path.join(venv_of(home), "bin", "jupyter"), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
          f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", "Start_Here.ipynb"],
-        cwd=home, env=student_env(home, cls, device, pin), stdout=out, stderr=out, start_new_session=True)
+        cwd=home, env=student_env(home, cls, device, pin, mqtt_user), stdout=out, stderr=out, start_new_session=True)
     running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time()}
 
 
@@ -305,7 +305,7 @@ def reconcile(plan):
             continue
         if key not in running and not w.get("_wait"):
             try:
-                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"))
+                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"), mqtt_name(w))
             except OSError as error:
                 log("cannot start", key, error)
 
@@ -315,6 +315,12 @@ MQTT_PORT = 1883
 MQTT_DIR = os.path.join(ROOT, ".mqtt")
 MQTT_HOST = [""]                  # the address of this Jetson as the teacher sees it (set by hello)
 broker = {"proc": None, "users": None}
+
+
+def mqtt_name(p):
+    """The MQTT user of a student: the teacher page decides it (class_student, with _2 if two students would clash)."""
+    name = str(p.get("mqtt_user") or "")
+    return name if re.match(r"^[a-z0-9_]{1,45}$", name) else f"{p['class']}_{p['student']}"
 
 
 def mqtt_ready():
@@ -332,12 +338,12 @@ def mqtt_stop():
 
 
 def mqtt_sync(plan):
-    """One MQTT account per student whose lab is running: user class__student, password = the PIN, and only the topics class/student/#.
+    """One MQTT account per student whose lab is running: user class_student, password = the PIN, and only the topics class/student/#.
     The broker is a program of the agent (no sudo needed): it starts with the first student and stops with the last."""
     users = {}
     for p in plan:
         if NAME.match(str(p.get("class", ""))) and NAME.match(str(p.get("student", ""))):
-            users[f"{p['class']}__{p['student']}"] = (str(p["pin"]), f"{p['class']}/{p['student']}")
+            users[mqtt_name(p)] = (str(p["pin"]), f"{p['class']}/{p['student']}")
     if not users:
         return mqtt_stop()
     if not mqtt_ready():
