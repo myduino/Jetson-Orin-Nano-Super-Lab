@@ -4,6 +4,7 @@ open_camera()  opens the camera your teacher chose for you on the teacher page
 mqtt()         connects this notebook to the MQTT broker of your own (ESP32 boards and phone apps use it too)
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
+record()       record sound from the microphone (webcam or USB); play() plays it; MicStream() listens all the time
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
 train_lock()   one model training at a time (shares the lock of build_lock)
 setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets the next one in)
@@ -76,6 +77,148 @@ def open_camera(size=(640, 480), mjpg=True):
         raise SystemExit("Cannot open the camera. Check the USB cable, close other programs that use it, "
                          "and ask your teacher to check your camera on the teacher page")
     return cap
+
+
+# ---------------------------------------------------------------- sound (microphone and speaker)
+def _device_file(kind):
+    return os.path.join(os.environ.get("LAB_HOME") or os.path.expanduser("~"), "." + kind)
+
+
+def _device_get(kind):
+    try:
+        return open(_device_file(kind)).read().strip() or "default"
+    except OSError:
+        return "default"
+
+
+def mic_get():
+    """The microphone chosen with mic_set(), or "default"."""
+    return _device_get("mic")
+
+
+def mic_set(device):
+    """Choose the microphone for all labs, for example mic_set("plughw:2,0"). Find the name with audio_devices()."""
+    with open(_device_file("mic"), "w") as f:
+        f.write(device)
+    print("Microphone set to", device)
+
+
+def speaker_get():
+    return _device_get("speaker")
+
+
+def speaker_set(device):
+    """Choose the speaker (a name of aplay -l, for example "plughw:1,0")."""
+    with open(_device_file("speaker"), "w") as f:
+        f.write(device)
+    print("Speaker set to", device)
+
+
+def audio_devices():
+    """Print the microphones (arecord -l) and the speakers (aplay -l) of this Jetson. 'card 2, device 0' is written plughw:2,0."""
+    for title, tool in (("Microphones", "arecord"), ("Speakers", "aplay")):
+        print(f"--- {title} ({tool} -l) ---")
+        try:
+            print(subprocess.run([tool, "-l"], capture_output=True, text=True).stdout.strip() or "none found")
+        except FileNotFoundError:
+            print(tool, "is not installed. Run: sudo apt install alsa-utils")
+
+
+def record(seconds=3, rate=16000, mic=None):
+    """Record from the microphone and return the sound as a numpy array of numbers between -1 and 1 (mono)."""
+    import numpy as np
+    mic = mic or mic_get()
+    cmd = ["arecord", "-q", "-D", mic, "-f", "S16_LE", "-r", str(rate), "-c", "1", "-t", "raw", "-d", str(max(1, int(seconds + 0.999))), "-"]
+    try:
+        out = subprocess.run(cmd, capture_output=True)
+    except FileNotFoundError:
+        raise SystemExit("arecord is not installed. Run: sudo apt install alsa-utils")
+    if out.returncode != 0:
+        raise SystemExit("Cannot record: " + out.stderr.decode(errors="replace").strip() +
+                         "\nCheck the name of the microphone with labview.audio_devices() and set it with labview.mic_set(...)")
+    data = np.frombuffer(out.stdout, dtype=np.int16).astype(np.float32) / 32768
+    return data[:int(seconds * rate)]
+
+
+class MicStream:
+    """Listen all the time in a background thread. latest(seconds) gives the newest sound. Call stop() when you are done."""
+
+    def __init__(self, rate=16000, mic=None, keep=6.0):
+        import numpy as np
+        self.rate = rate
+        self._np = np
+        self._buf = np.zeros(int(keep * rate), np.float32)
+        self._lock = threading.Lock()
+        self._proc = subprocess.Popen(["arecord", "-q", "-D", mic or mic_get(), "-f", "S16_LE", "-r", str(rate), "-c", "1", "-t", "raw", "-"],
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        np = self._np
+        chunk = int(self.rate * 0.05) * 2                       # 50 ms of 16-bit sound
+        while self._proc.poll() is None:
+            raw = self._proc.stdout.read(chunk)
+            if not raw:
+                break
+            data = np.frombuffer(raw[:len(raw) // 2 * 2], dtype=np.int16).astype(np.float32) / 32768
+            with self._lock:
+                self._buf = np.concatenate([self._buf[len(data):], data])
+
+    def latest(self, seconds=1.0):
+        with self._lock:
+            return self._buf[-int(seconds * self.rate):].copy()
+
+    def alive(self):
+        return self._proc.poll() is None
+
+    def error(self):
+        """The message of arecord when it stopped (a wrong microphone name, or another program uses it)."""
+        try:
+            return self._proc.stderr.read().decode(errors="replace").strip() if self._proc.poll() is not None else ""
+        except Exception:
+            return ""
+
+    def stop(self):
+        if self._proc.poll() is None:
+            self._proc.terminate()
+
+
+def save_wav(data, path="sound.wav", rate=16000):
+    """Write a numpy sound (-1 to 1) as a WAV file."""
+    import wave
+    import numpy as np
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes((np.clip(data, -1, 1) * 32767).astype(np.int16).tobytes())
+    return path
+
+
+def load_wav(path):
+    """Read a mono 16-bit WAV file. Returns (numpy sound between -1 and 1, sample rate)."""
+    import wave
+    import numpy as np
+    with wave.open(path, "rb") as w:
+        rate, channels = w.getframerate(), w.getnchannels()
+        data = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+    return (data.reshape(-1, channels).mean(axis=1) if channels > 1 else data), rate
+
+
+def play(sound, rate=16000, browser=True, speaker=True):
+    """Play a sound (numpy array or the path of a WAV file).
+    browser=True: a player appears under the cell and plays on your laptop. speaker=True: plays on the speaker of the Jetson."""
+    path = sound if isinstance(sound, str) else save_wav(sound, os.path.join(tempfile.gettempdir(), f"labplay_{os.getpid()}.wav"), rate)
+    if browser:
+        from IPython.display import Audio, display
+        display(Audio(filename=path) if isinstance(sound, str) else Audio(sound, rate=rate))
+    if speaker:
+        dev = speaker_get()
+        try:
+            subprocess.run(["aplay", "-q"] + ([] if dev == "default" else ["-D", dev]) + [path], capture_output=True, timeout=120)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
 
 
 # ---------------------------------------------------------------- sudo in notebooks
