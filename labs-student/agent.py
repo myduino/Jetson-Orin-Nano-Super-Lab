@@ -157,7 +157,7 @@ def prepare(home):
                     shutil.copyfile(os.path.join(labs, folder, f), dest)
 
 
-def student_env(home, cls, camera_device, pin=None, mqtt_user=None):
+def student_env(home, cls, camera_device, pin=None, mqtt_port=None):
     env = dict(os.environ)
     venv = venv_of(home)
     env.update(
@@ -173,10 +173,8 @@ def student_env(home, cls, camera_device, pin=None, mqtt_user=None):
         YOLO_CONFIG_DIR=os.path.join(home, ".config", "Ultralytics"), MPLCONFIGDIR=os.path.join(home, ".config", "matplotlib"),
     )
     env.pop("PYTHONHOME", None)
-    if pin is not None:                                    # the student's MQTT account on this Jetson (see the MQTT broker section)
-        student = os.path.basename(home)
-        env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(MQTT_PORT), LAB_MQTT_USER=mqtt_user or f"{cls}_{student}", LAB_MQTT_PASS=str(pin),
-                   LAB_MQTT_PREFIX=f"{cls}/{student}/")
+    if pin is not None and mqtt_port:                      # the student's own MQTT broker (see the MQTT section)
+        env.update(LAB_MQTT_HOST=MQTT_HOST[0], LAB_MQTT_PORT=str(mqtt_port), LAB_MQTT_USER=os.path.basename(home), LAB_MQTT_PASS=str(pin))
     if camera_device:
         env["LAB_CAMERA"] = camera_device
     else:
@@ -186,17 +184,19 @@ def student_env(home, cls, camera_device, pin=None, mqtt_user=None):
     return env
 
 
-def start(cls, student, port, pin, camera, mqtt_user=None):
+def start(cls, student, port, pin, camera, mqtt_port=None):
     home = os.path.join(ROOT, cls, student)
     prepare(home)
+    mqtt_port = mqtt_port or int(port) - 7000
     device = next((c["device"] for c in cameras() if c["number"] == camera), "") if camera is not None else ""
     log("start", f"{cls}/{student}", "port", port, "camera", camera if camera is not None else "-")
     out = open(os.path.join(home, ".jupyter", "server.log"), "ab")
     proc = subprocess.Popen(
         [os.path.join(venv_of(home), "bin", "jupyter"), "lab", "--no-browser", "--ip=0.0.0.0", f"--port={port}", "--ServerApp.port_retries=0",
          f"--ServerApp.token={pin}", "--ServerApp.allow_remote_access=True", "Start_Here.ipynb"],
-        cwd=home, env=student_env(home, cls, device, pin, mqtt_user), stdout=out, stderr=out, start_new_session=True)
-    running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time()}
+        cwd=home, env=student_env(home, cls, device, pin, mqtt_port), stdout=out, stderr=out, start_new_session=True)
+    running[f"{cls}__{student}"] = {"proc": proc, "port": port, "pin": pin, "camera": camera, "started": time.time(),
+                                    "mqtt": mqtt_start(home, student, pin, mqtt_port), "mqtt_port": mqtt_port}
 
 
 def stop(key):
@@ -204,6 +204,7 @@ def stop(key):
     if not r:
         return
     log("stop", key.replace("__", "/"))
+    mqtt_stop(r.get("mqtt"))
     try:
         os.killpg(r["proc"].pid, signal.SIGTERM)
         r["proc"].wait(timeout=8)
@@ -296,6 +297,10 @@ def reconcile(plan):
             stop(key)
             if gone and time.time() - r["started"] < 15:
                 wanted[key]["_wait"] = True                                  # it stops at once: do not restart in a loop
+    for key, r in running.items():                                           # a broker that stopped by itself starts again
+        if r.get("mqtt") is not None and r["mqtt"].poll() is not None:
+            home = os.path.join(ROOT, *key.split("__", 1))
+            r["mqtt"] = mqtt_start(home, key.split("__", 1)[1], r["pin"], r["mqtt_port"])
     for key, w in wanted.items():
         home = os.path.join(ROOT, w["class"], w["student"])
         if key not in running and not venv_ready(home):            # the student's own Python environment first
@@ -305,72 +310,47 @@ def reconcile(plan):
             continue
         if key not in running and not w.get("_wait"):
             try:
-                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"), mqtt_name(w))
+                start(w["class"], w["student"], int(w["port"]), str(w["pin"]), w.get("camera"), w.get("mqtt_port"))
             except OSError as error:
                 log("cannot start", key, error)
 
 
-# ---------------------------------------------------------------- MQTT broker (for the ESP32 labs and phone apps)
-MQTT_PORT = 1883
-MQTT_DIR = os.path.join(ROOT, ".mqtt")
+# ---------------------------------------------------------------- MQTT broker of each student (ESP32 boards, phone apps)
 MQTT_HOST = [""]                  # the address of this Jetson as the teacher sees it (set by hello)
-broker = {"proc": None, "users": None}
-
-
-def mqtt_name(p):
-    """The MQTT user of a student: the teacher page decides it (class_student, with _2 if two students would clash)."""
-    name = str(p.get("mqtt_user") or "")
-    return name if re.match(r"^[a-z0-9_]{1,45}$", name) else f"{p['class']}_{p['student']}"
 
 
 def mqtt_ready():
     return bool(shutil.which("mosquitto") and shutil.which("mosquitto_passwd"))
 
 
-def mqtt_stop():
-    p, broker["proc"], broker["users"] = broker["proc"], None, None
-    if p and p.poll() is None:
-        p.terminate()
-        try:
-            p.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            p.kill()
-
-
-def mqtt_sync(plan):
-    """One MQTT account per student whose lab is running: user class_student, password = the PIN, and only the topics class/student/#.
-    The broker is a program of the agent (no sudo needed): it starts with the first student and stops with the last."""
-    users = {}
-    for p in plan:
-        if NAME.match(str(p.get("class", ""))) and NAME.match(str(p.get("student", ""))):
-            users[mqtt_name(p)] = (str(p["pin"]), f"{p['class']}/{p['student']}")
-    if not users:
-        return mqtt_stop()
+def mqtt_start(home, user, pin, port):
+    """The student's own MQTT broker, on its own port like their JupyterLab: user = the student's name, password = the PIN.
+    It is a program of the agent (no sudo needed) and stops with the student's lab."""
     if not mqtt_ready():
-        return
-    alive = broker["proc"] is not None and broker["proc"].poll() is None
-    if alive and broker["users"] == users:
-        return
-    os.makedirs(MQTT_DIR, exist_ok=True)
-    passwd, acl, conf = (os.path.join(MQTT_DIR, n) for n in ("passwd", "acl", "mosquitto.conf"))
-    first = True
-    for user, (pin, _) in users.items():
-        subprocess.run(["mosquitto_passwd"] + (["-c"] if first else []) + ["-b", passwd, user, pin], check=True, capture_output=True)
-        first = False
-    with open(acl, "w") as f:
-        for user, (_, prefix) in users.items():
-            f.write(f"user {user}\ntopic readwrite {prefix}/#\n\n")
-    with open(conf, "w") as f:
-        f.write(f"listener {MQTT_PORT} 0.0.0.0\nallow_anonymous false\npassword_file {passwd}\nacl_file {acl}\npersistence false\n")
-    for f in (passwd, acl, conf):
-        os.chmod(f, 0o600)
-    if alive:
-        broker["proc"].send_signal(signal.SIGHUP)                              # the broker reads the new users and rules
-    else:
-        broker["proc"] = subprocess.Popen(["mosquitto", "-c", conf], stdout=open(os.path.join(MQTT_DIR, "mosquitto.log"), "ab"),
-                                          stderr=subprocess.STDOUT, start_new_session=True)
-        log("MQTT broker started on port", MQTT_PORT)
-    broker["users"] = users
+        return None
+    folder = os.path.join(home, ".mqtt")
+    os.makedirs(folder, exist_ok=True)
+    passwd, conf = os.path.join(folder, "passwd"), os.path.join(folder, "mosquitto.conf")
+    try:
+        subprocess.run(["mosquitto_passwd", "-c", "-b", passwd, user, str(pin)], check=True, capture_output=True)
+        with open(conf, "w") as f:
+            f.write(f"listener {port} 0.0.0.0\nallow_anonymous false\npassword_file {passwd}\npersistence false\n")
+        for f in (passwd, conf):
+            os.chmod(f, 0o600)
+        return subprocess.Popen(["mosquitto", "-c", conf], stdout=open(os.path.join(folder, "mosquitto.log"), "ab"), stderr=subprocess.STDOUT,
+                                start_new_session=True)
+    except (subprocess.CalledProcessError, OSError) as error:
+        log("cannot start the MQTT broker of", user, error)
+        return None
+
+
+def mqtt_stop(proc):
+    if proc and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 # ---------------------------------------------------------------- progress: read from the students' saved notebooks
@@ -490,7 +470,6 @@ def main():
                 for d in answer.get("delete", []):
                     delete_folder(str(d.get("class", "")), str(d.get("student", "")))
                 reconcile(answer.get("plan", []))
-                mqtt_sync(answer.get("plan", []))
                 shown = ""
             except (urllib.error.URLError, OSError, ValueError) as error:
                 if str(error) != shown:                                      # say it once, not every 5 seconds
@@ -500,12 +479,10 @@ def main():
                     log("no news from the teacher for", GRACE // 60, "minutes: stopping all student sessions")
                     for key in list(running):
                         stop(key)
-                    mqtt_stop()
             time.sleep(EVERY)
     finally:
         for key in list(running):
             stop(key)
-        mqtt_stop()
 
 
 if __name__ == "__main__":
