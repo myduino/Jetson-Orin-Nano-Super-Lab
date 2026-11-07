@@ -13,6 +13,7 @@ setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets th
 """
 import getpass
 import os
+import re
 import shutil
 import stat
 import sys
@@ -259,11 +260,31 @@ def _device_file(kind):
     return os.path.join(os.environ.get("LAB_HOME") or os.path.expanduser("~"), "." + kind)
 
 
-def _device_get(kind):
+def _usb_cards(tool):
+    """The sound cards that are not the built-in NVIDIA ones (arecord -l or aplay -l): a list of (name, "plughw:card,device")."""
     try:
-        return open(_device_file(kind)).read().strip() or "default"
+        out = subprocess.run([tool, "-l"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    cards = []
+    for line in out.splitlines():
+        m = re.match(r"card (\d+): .*?\[(.*?)\], device (\d+):", line)
+        if m and "NVIDIA" not in m.group(2) and "Tegra" not in m.group(2):
+            cards.append((m.group(2), f"plughw:{m.group(1)},{m.group(3)}"))
+    return cards
+
+
+def _device_get(kind):
+    """The device chosen with mic_set / speaker_set. If none was chosen: the first USB card, else "default".
+    (The "default" of the Jetson is a built-in chip with nothing plugged in, so it would record silence.)"""
+    try:
+        chosen = open(_device_file(kind)).read().strip()
     except OSError:
-        return "default"
+        chosen = ""
+    if chosen:
+        return chosen
+    cards = _usb_cards("arecord" if kind == "mic" else "aplay")
+    return cards[0][1] if cards else "default"
 
 
 def qr_picture(text, size=6):
@@ -331,13 +352,19 @@ def speaker_set(device):
 
 
 def audio_devices():
-    """Print the microphones (arecord -l) and the speakers (aplay -l) of this Jetson. 'card 2, device 0' is written plughw:2,0."""
-    for title, tool in (("Microphones", "arecord"), ("Speakers", "aplay")):
-        print(f"--- {title} ({tool} -l) ---")
+    """Print the USB microphones and speakers of this Jetson, and the ones the labs use now.
+    'card 2, device 0' is written plughw:2,0. Choose another with mic_set(...) or speaker_set(...)."""
+    for title, tool, kind in (("Microphones", "arecord", "mic"), ("Speakers", "aplay", "speaker")):
+        print(f"--- {title} ---")
         try:
-            print(subprocess.run([tool, "-l"], capture_output=True, text=True).stdout.strip() or "none found")
-        except FileNotFoundError:
-            print(tool, "is not installed. Run: sudo apt install alsa-utils")
+            cards = _usb_cards(tool)
+        except Exception:
+            cards = []
+        if not cards:
+            print("no USB device found (the built-in chips of the Jetson have nothing plugged in)")
+        for name, dev in cards:
+            print(f"  {dev}   {name}")
+        print("  used by the labs now:", _device_get(kind))
 
 
 def record(seconds=3, rate=16000, mic=None):
