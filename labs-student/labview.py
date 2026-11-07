@@ -235,7 +235,9 @@ class LiveView:
         self._shared = time.time()
         try:
             h, w = picture.shape[:2]
-            ok, buf = cv2.imencode(".jpg", cv2.resize(picture, (480, max(1, int(h * 480 / w)))), [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if w > 800:                                # the camera's own size (640 wide) is kept; only bigger pictures are made smaller
+                picture = cv2.resize(picture, (800, max(1, int(h * 800 / w))))
+            ok, buf = cv2.imencode(".jpg", picture, [cv2.IMWRITE_JPEG_QUALITY, 88])
             if ok:
                 path = os.path.join(home, ".tmp", "live.jpg")
                 with open(path + ".part", "wb") as f:
