@@ -19,7 +19,7 @@ NAME="$(printf '%s' "$NAME" | tr 'A-Z-' 'a-z_' | sed 's/[^a-z0-9_]/_/g' | cut -c
 echo "== Myduino Jetson Orin Nano Super Lab: setup of this Jetson =="
 echo "== 1. Python tools =="
 sudo apt update
-sudo apt install -y python3-venv python3-pip git curl mosquitto mosquitto-clients
+sudo apt install -y python3-venv python3-pip git curl mosquitto mosquitto-clients tesseract-ocr libzbar0
 # The agent runs its own MQTT broker for the students (ESP32 labs, phone apps): the one of the system must not take the port.
 sudo systemctl disable --now mosquitto > /dev/null 2>&1 || true
 # jtop (used in Lab 1) needs its own service, or it says "jtop service is not active".
