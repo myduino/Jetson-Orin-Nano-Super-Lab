@@ -6,6 +6,7 @@ live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 record()       record sound from the microphone (webcam or USB); play() plays it; MicStream() listens all the time
 ollama_chat()  ask the language model that runs on this Jetson (Ollama); ollama_models(), ollama_pull()
+Esp32()        the Jetson side of the link to the ESP32 board; VirtualEsp32() is a pretend board; esp32_files() writes the board program
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
 train_lock()   one model training at a time (shares the lock of build_lock)
 setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets the next one in)
@@ -31,6 +32,9 @@ def mqtt_info():
             "password": env.get("LAB_MQTT_PASS", "")}
 
 
+_mqtt_count = [0]
+
+
 def mqtt(on_message=None, subscribe=()):
     """Connect this notebook to your MQTT broker and return the client.
     on_message(topic, text) is called for every message on the topics in subscribe (for example ["temperature"], or "#" for all)."""
@@ -42,7 +46,8 @@ def mqtt(on_message=None, subscribe=()):
     info = mqtt_info()
     if not info["port"]:
         raise SystemExit("No MQTT broker. Ask your teacher to start the lab, then restart this notebook's kernel.")
-    name = f"{info['user']}-nb-{os.getpid()}"
+    _mqtt_count[0] += 1
+    name = f"{info['user']}-nb-{os.getpid()}-{_mqtt_count[0]}"          # every client needs its own name
     try:
         client = paho.Client(paho.CallbackAPIVersion.VERSION2, client_id=name)
     except AttributeError:                                    # an older paho-mqtt
@@ -55,6 +60,162 @@ def mqtt(on_message=None, subscribe=()):
         client.subscribe(topic)
     client.loop_start()
     return client
+
+
+# ---------------------------------------------------------------- the ESP32-S3 board (IoT) and the Jetson (AI)
+def esp32_files(wifi_name="", wifi_password="", folder="esp32"):
+    """Copy the program of the ESP32 board (main.py and config.py) into your folder.
+    The MQTT lines of config.py are filled with the details of YOUR broker. Upload the files to the board with Thonny."""
+    import re
+    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "esp32")
+    os.makedirs(folder, exist_ok=True)
+    info = mqtt_info()
+    for name in ("main.py", "config.py"):
+        text = open(os.path.join(source, name)).read()
+        if name == "config.py":
+            for key, value in (("MQTT_HOST", f'"{info["host"]}"'), ("MQTT_PORT", str(info["port"])), ("MQTT_USER", f'"{info["user"]}"'),
+                               ("MQTT_PASSWORD", f'"{info["password"]}"'), ("WIFI_SSID", f'"{wifi_name}"' if wifi_name else None),
+                               ("WIFI_PASSWORD", f'"{wifi_password}"' if wifi_password else None)):
+                if value:
+                    text = re.sub(rf"^{key} = .*?(\s+#.*)?$", lambda m, k=key, v=value: f"{k} = {v}" + (m.group(1) or ""), text, flags=re.M)
+        with open(os.path.join(folder, name), "w") as f:
+            f.write(text)
+        print("Wrote", os.path.join(folder, name))
+
+
+class Esp32:
+    """The Jetson side of the link to the ESP32 board. The Jetson does the AI, the board does the IoT.
+    send("led", "on") sends a command. online() tells if the board is alive. sensors, telemetry, events and latencies hold what came back.
+    A heartbeat goes to the board every 5 seconds: if it stops, the board switches the alert off (fail-safe)."""
+
+    def __init__(self):
+        self.status = "unknown"
+        self.telemetry, self.sensors, self.events, self.latencies = {}, {}, [], []
+        self.last_heard = 0.0
+        self._sent = {}
+        self._stop = threading.Event()
+        self.client = mqtt(self._on_message, subscribe=["esp/#"])
+        threading.Thread(target=self._heartbeat, daemon=True).start()
+
+    def _on_message(self, topic, text):
+        now = time.time()
+        if topic == "esp/status":
+            self.status = text                              # may be a retained message from an old session
+        elif topic == "esp/telemetry":
+            self.last_heard = now
+            try:
+                import json
+                self.telemetry = json.loads(text)
+            except ValueError:
+                pass
+        elif topic.startswith("esp/sensor/"):
+            self.last_heard = now
+            try:
+                self.sensors[topic.split("/")[-1]] = (float(text), now)
+            except ValueError:
+                self.sensors[topic.split("/")[-1]] = (text, now)
+        elif topic == "esp/ack":
+            self.last_heard = now
+            sent = self._sent.pop(text, None)
+            if sent:
+                self.latencies.append(now - sent)
+        elif topic == "esp/event":
+            self.events.append((now, text))
+
+    def _heartbeat(self):
+        while not self._stop.wait(5.0):
+            self.client.publish("jetson/hb", "1")
+
+    def send(self, name, value):
+        """Send a command to the board, for example send("led", "on"), send("servo", 90), send("buzzer", 500), send("alert", "on")."""
+        self._sent[f"{name}={value}"] = time.time()
+        self.client.publish(f"esp/cmd/{name}", str(value))
+
+    def online(self, within=15.0):
+        """True when the board says online and was heard in the last `within` seconds."""
+        return self.status == "online" and time.time() - self.last_heard < within
+
+    def close(self):
+        self._stop.set()
+        self.client.loop_stop()
+        self.client.disconnect()
+
+
+class VirtualEsp32:
+    """A pretend ESP32 board that runs in Python. It follows the same rules and topics as esp32/main.py, so you can build and test
+    your AIoT program before the real board is on your table. Later, switch it off (stop()) and switch the real board on: nothing else changes."""
+
+    def __init__(self):
+        import random
+        self._random = random
+        self.led, self.alert, self.servo, self.buzzer_until = "off", False, 90, 0.0
+        self.hb = time.time()
+        self.light = 2000.0
+        self.log = []
+        self._stop = threading.Event()
+        self.client = mqtt(self._on_message, subscribe=["esp/cmd/#", "jetson/hb"])
+        self.client.publish("esp/status", "online", retain=True)
+        self.started = time.time()
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _say(self, topic, text, retain=False):
+        self.client.publish(topic, str(text), retain=retain)
+
+    def _note(self, text):
+        self.log.append((time.time(), text))
+
+    def _on_message(self, topic, text):
+        name = topic.split("/")[-1]
+        if topic.startswith("esp/cmd/"):
+            try:
+                if name == "led":
+                    self.led = text
+                elif name == "buzzer":
+                    self.buzzer_until = time.time() + int(text) / 1000
+                elif name == "servo":
+                    self.servo = max(0, min(180, int(text)))
+                elif name == "alert":
+                    self.alert = text == "on"
+                    self.hb = time.time()
+                else:
+                    return
+            except ValueError:
+                self._say("esp/event", f"bad value for {name}: {text}")
+                return
+            self._note(f"{name} = {text}")
+            self._say("esp/ack", f"{name}={text}")
+        elif topic == "jetson/hb":
+            self.hb = time.time()
+
+    def _run(self):
+        last_sensor = last_telemetry = 0.0
+        while not self._stop.wait(0.1):
+            now = time.time()
+            if self.alert and now - self.hb > 15:
+                self.alert = False
+                self._note("fail-safe: no heartbeat, alert off")
+                self._say("esp/event", "failsafe: no heartbeat from the Jetson, alert off")
+            if now - last_sensor > 2:
+                last_sensor = now
+                self.light = min(4095, max(0, self.light + self._random.uniform(-60, 60)))
+                self._say("esp/sensor/light", int(self.light))
+            if now - last_telemetry > 5:
+                last_telemetry = now
+                import json
+                self._say("esp/telemetry", json.dumps({"uptime_s": int(now - self.started), "rssi": -55, "led": self.led,
+                                                       "alert": self.alert, "servo": self.servo}))
+
+    def describe(self):
+        """What the board does now, as text."""
+        beeping = time.time() < self.buzzer_until or self.alert
+        return f"LED {'BLINK FAST' if self.alert else self.led.upper()} | buzzer {'ON' if beeping else 'off'} | servo {self.servo} degrees | alert {'ON' if self.alert else 'off'}"
+
+    def stop(self):
+        self._stop.set()
+        self._say("esp/status", "offline", retain=True)
+        time.sleep(0.2)
+        self.client.loop_stop()
+        self.client.disconnect()
 
 
 # ---------------------------------------------------------------- camera
