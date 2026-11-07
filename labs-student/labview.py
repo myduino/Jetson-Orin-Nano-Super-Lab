@@ -5,6 +5,7 @@ mqtt()         connects this notebook to the MQTT broker of your own (ESP32 boar
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
+train_lock()   one model training at a time (shares the lock of build_lock)
 setup_begin()  one student at a time runs the Lab 0 install (setup_end() lets the next one in)
 """
 import getpass
@@ -157,6 +158,12 @@ class build_lock(_Lock):
     path = property(lambda self: _lock_path("build.lock"))
     waiting = "building an engine"
     reason = "Only one build at a time fits in the 8 GB memory,"
+
+
+class train_lock(build_lock):
+    """with train_lock():  ...   Training a model uses most of the memory, too. It takes turns with the engine builds (same lock)."""
+    waiting = "training a model"
+    reason = "Training uses most of the 8 GB memory,"
 
 
 _setup = None
