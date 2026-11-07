@@ -274,6 +274,28 @@ def _usb_cards(tool):
     return cards
 
 
+def _hdmi_ports():
+    """The HDMI sound outputs of the Jetson: a list of ("plughw:0,3", monitor_present)."""
+    try:
+        out = subprocess.run(["aplay", "-l"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    ports = []
+    for line in out.splitlines():
+        m = re.match(r"card (\d+): .*HDMI.*?device (\d+): HDMI", line) or re.match(r"card (\d+): [^,]*HDA[^,]*, device (\d+): HDMI", line)
+        if m:
+            card, dev = m.group(1), m.group(2)
+            present = False
+            try:                                 # a monitor on the port shows in the ELD files of the sound card
+                for name in os.listdir(f"/proc/asound/card{card}"):
+                    if name.startswith("eld#") and "monitor_present\t\t1" in open(f"/proc/asound/card{card}/{name}").read():
+                        present = True
+            except OSError:
+                pass
+            ports.append((f"plughw:{card},{dev}", present))
+    return ports
+
+
 def _device_get(kind):
     """The device chosen with mic_set / speaker_set. If none was chosen: the first USB card, else "default".
     (The "default" of the Jetson is a built-in chip with nothing plugged in, so it would record silence.)"""
@@ -284,7 +306,13 @@ def _device_get(kind):
     if chosen:
         return chosen
     cards = _usb_cards("arecord" if kind == "mic" else "aplay")
-    return cards[0][1] if cards else "default"
+    if cards:
+        return cards[0][1]
+    if kind == "speaker":                       # the speakers of a monitor on HDMI: the port that has a monitor, else the first port
+        ports = _hdmi_ports()
+        if ports:
+            return sorted(ports, key=lambda p: not p[1])[0][0]
+    return "default"
 
 
 def qr_picture(text, size=6):
@@ -360,10 +388,13 @@ def audio_devices():
             cards = _usb_cards(tool)
         except Exception:
             cards = []
-        if not cards:
+        if not cards and not (kind == "speaker" and _hdmi_ports()):
             print("no USB device found (the built-in chips of the Jetson have nothing plugged in)")
         for name, dev in cards:
             print(f"  {dev}   {name}")
+        if kind == "speaker":
+            for dev, present in _hdmi_ports():
+                print(f"  {dev}   HDMI (monitor speakers)" + ("   <- a monitor is connected" if present else ""))
         print("  used by the labs now:", _device_get(kind))
 
 
