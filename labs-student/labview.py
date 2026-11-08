@@ -5,7 +5,7 @@ mqtt()         connects this notebook to the MQTT broker of your own (ESP32 boar
 live()         live picture inside a notebook, with Stop and Save buttons
 sudo_login()   asks for your password once, so "sudo" works in notebook cells
 record()       record sound from the microphone (webcam or USB); play() plays it; MicStream() listens all the time
-ollama_chat()  ask the language model that runs on this Jetson (Ollama); ollama_models(), ollama_pull()
+llm_start(), llm_chat()  start and ask the language model that runs on this Jetson (llama.cpp); llm_link(), llm_stop()
 Esp32()        the Jetson side of the link to the ESP32 board; VirtualEsp32() is a pretend board; esp32_files() writes the board program
 build_lock()   one TensorRT build at a time on the Jetson (the 8 GB memory fits one)
 train_lock()   one model training at a time (shares the lock of build_lock)
@@ -495,78 +495,139 @@ def play(sound, rate=16000, browser=True, speaker=True):
             pass
 
 
-# ---------------------------------------------------------------- language models (Ollama runs on this Jetson)
-OLLAMA = os.environ.get("OLLAMA_HOST_URL", "http://127.0.0.1:11434")
+# ---------------------------------------------------------------- language models (llama.cpp runs on this Jetson)
+LLM_URL = os.environ.get("LLM_URL", "http://127.0.0.1:8080")
+LLM_PORT = 8080
+LLM_DIR = os.path.expanduser("~/models")
+LLM_SERVER = os.path.expanduser("~/llama.cpp/build/bin/llama-server")
+LLM_LOG = os.path.expanduser("~/llama-server.log")
+# The model of the labs (Q4_K_M = 4 bit, about 1.3 GB) and its "eyes" file (the mmproj) for pictures.
+LLM_HF = "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/"
+LLM_FILE = "Qwen3.5-2B-Q4_K_M.gguf"
+LLM_EYES = "mmproj-F16.gguf"                         # the name on the web site
+LLM_EYES_HERE = "Qwen3.5-2B-mmproj-F16.gguf"          # the name on this Jetson (each model has its own)
 
 
-def _ollama(path, body=None, timeout=600):
-    """Send one request to the Ollama server of this Jetson. Returns the open answer (read it line by line)."""
+def _llm(path, body=None, timeout=600):
+    """Send one request to llama-server on this Jetson. Returns the open answer."""
     import json
     import urllib.error
     import urllib.request
-    request = urllib.request.Request(OLLAMA + path, data=None if body is None else json.dumps(body).encode(),
+    request = urllib.request.Request(LLM_URL + path, data=None if body is None else json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
     try:
         return urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.URLError as error:
-        raise SystemExit(f"Cannot reach Ollama at {OLLAMA} ({error.reason}). Is it installed and running? "
-                         "See Part A of the lab (ollama --version, sudo systemctl status ollama).")
+        raise SystemExit(f"Cannot reach the language model at {LLM_URL} ({error.reason}). "
+                         "Is the server started? One student of this Jetson runs llm_start() (Part A of the lab).")
 
 
-def ollama_models():
-    """The names of the language models that are downloaded on this Jetson."""
-    import json
-    with _ollama("/api/tags", timeout=10) as answer:
-        return [m["name"] for m in json.load(answer).get("models", [])]
+def llm_ready():
+    """True when the language model server is running and the model is loaded."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(LLM_URL + "/health", timeout=3) as answer:
+            return answer.status == 200
+    except Exception:
+        return False
 
 
-def ollama_pull(model, show=print):
-    """Download a model (only the first student needs to). Shows the progress every 10 %."""
-    import json
-    last = None
-    with _ollama("/api/pull", {"name": model, "stream": True}, timeout=3600) as answer:
-        for line in answer:
-            info = json.loads(line)
-            if info.get("error"):
-                raise SystemExit("Download failed: " + info["error"])
-            status, total = info.get("status", ""), info.get("total")
-            step = int(10 * info.get("completed", 0) / total) if total else None
-            if (status, step) != last:
-                last = (status, step)
-                show(status + (f" {10 * step} %" if total else ""))
+def llm_link():
+    """The address of the chat page. Open it in the browser of any laptop in the same network."""
+    import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("8.8.8.8", 80))
+        ip = probe.getsockname()[0]
+    except OSError:
+        ip = "127.0.0.1"
+    finally:
+        probe.close()
+    return f"http://{ip}:{LLM_PORT}"
 
 
-def ollama_chat(messages, model="llama3.2:1b", options=None, images=None, on_token=None, keep_alive="10m"):
+def llm_download(show=print):
+    """Download the model files (only one student per Jetson needs to; a file that is already here is skipped)."""
+    os.makedirs(LLM_DIR, exist_ok=True)
+    for name, remote in ((LLM_FILE, LLM_FILE), (LLM_EYES_HERE, LLM_EYES)):
+        path = os.path.join(LLM_DIR, name)
+        if os.path.exists(path) and not os.path.exists(path + ".part"):
+            show(f"{name}: already here")
+            continue
+        show(f"{name}: downloading (a few minutes)...")
+        command = ["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", LLM_HF + remote]
+        if subprocess.run(command).returncode != 0:
+            raise SystemExit(f"Download of {name} failed. Check the network and run this cell again (it continues where it stopped).")
+        os.replace(path + ".part", path)
+        show(f"{name}: done")
+
+
+def llm_start(wait=60):
+    """Start the language model server (only ONE student per Jetson runs this; the others use the same server).
+    Skips itself when the server is already running. Then prints the link of the chat page."""
+    if llm_ready():
+        print("The server is already running. Chat page:", llm_link())
+        return
+    if not os.path.exists(LLM_SERVER):
+        raise SystemExit("llama-server is not built on this Jetson (ask the teacher to run labs-setup.sh).")
+    llm_download()
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, LLM_FILE), "--mmproj", os.path.join(LLM_DIR, LLM_EYES_HERE),
+               "-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja",   # -lm none: load into the GPU memory directly (the default can run out of memory here)
+                "--host", "0.0.0.0", "--port", str(LLM_PORT)]
+    log = open(LLM_LOG, "w")
+    subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)   # keeps running after the notebook
+    started = time.time()
+    while time.time() - started < wait:
+        if llm_ready():
+            print(f"Ready after {time.time() - started:.0f} s. Chat page: {llm_link()}  (give this link to your team)")
+            return
+        time.sleep(2)
+    raise SystemExit("The server did not start in time. Look at the end of " + LLM_LOG + " (!tail -20 ~/llama-server.log)")
+
+
+def llm_stop():
+    """Stop the language model server (frees about 3 GB of memory)."""
+    subprocess.run(["pkill", "-f", "llama-server"])
+
+
+def llm_chat(messages, images=None, options=None, on_token=None):
     """Ask the language model. messages is a list like [{"role": "user", "content": "Hello"}].
-    images (optional): a list of JPEG pictures as bytes, for a vision model. on_token(text) is called for every piece of the answer.
+    images (optional): a list of JPEG pictures as bytes, for the last message. on_token(text) is called for every piece of the answer.
     Returns a dict: text, first_token_s (time to the first word), tokens, tokens_per_s, total_s."""
     import base64
     import json
     messages = [dict(m) for m in messages]
     if images:
-        messages[-1]["images"] = [base64.b64encode(i).decode() for i in images]
-    body = {"model": model, "messages": messages, "stream": True, "keep_alive": keep_alive,
-            "options": {"num_ctx": 2048, "temperature": 0.7, **(options or {})}}
+        parts = [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(i).decode()}}
+                 for i in images]
+        messages[-1]["content"] = parts + [{"type": "text", "text": messages[-1]["content"]}]
+    options = dict(options or {})
+    if "num_predict" in options:                       # the name that some other programs use
+        options["max_tokens"] = options.pop("num_predict")
+    body = {"messages": messages, "stream": True, "temperature": 0.7, "max_tokens": 400,
+            "chat_template_kwargs": {"enable_thinking": False}, **options}
     started = time.time()
-    first, text, final = None, "", {}
-    with _ollama("/api/chat", body) as answer:
+    first, text, timings = None, "", {}
+    with _llm("/v1/chat/completions", body) as answer:
         for line in answer:
-            info = json.loads(line)
+            line = line.decode().strip()
+            if not line.startswith("data:") or line.endswith("[DONE]"):
+                continue
+            info = json.loads(line[5:])
             if info.get("error"):
-                raise SystemExit("The model says: " + info["error"] + " (is the model downloaded? ollama_models() shows the list)")
-            piece = info.get("message", {}).get("content", "")
+                raise SystemExit("The model says: " + str(info["error"]))
+            choice = (info.get("choices") or [{}])[0]
+            piece = (choice.get("delta") or {}).get("content") or ""
             if piece:
                 if first is None:
                     first = time.time() - started
                 text += piece
                 if on_token:
                     on_token(piece)
-            if info.get("done"):
-                final = info
-    tokens = final.get("eval_count", 0)
-    seconds = final.get("eval_duration", 0) / 1e9
-    return {"text": text.strip(), "first_token_s": first or 0.0, "tokens": tokens,
-            "tokens_per_s": tokens / seconds if seconds else 0.0, "total_s": time.time() - started}
+            if info.get("timings"):
+                timings = info["timings"]
+    return {"text": text.strip(), "first_token_s": first or 0.0, "tokens": timings.get("predicted_n", 0),
+            "tokens_per_s": timings.get("predicted_per_second", 0.0), "total_s": time.time() - started}
 
 
 # ---------------------------------------------------------------- sudo in notebooks
