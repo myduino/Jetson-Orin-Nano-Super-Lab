@@ -60,9 +60,9 @@ No lab in this part trains a model. Students use pretrained models only.
 | 21 | Vision-Language Model (VLM) | Adds eyes (mmproj) to the LLM |
 | 22 | Multi-Modal AI Assistant | Vision, speech and language together |
 | 23 | Tool Calling | The LLM asks your code to run a function (new lab) |
-| 24 | Agentic AI | Agent loop: pick a tool, see the result, decide the next step (new lab) |
+| 24 | AI Agent | Agent loop: pick a tool, see the result, decide the next step (new lab) |
 
-The models come first (LLM, RAG, VLM, Multi-Modal). Tool Calling and Agentic AI come after them and lead into the AIoT labs, where the tools become real (sensors, door).
+The models come first (LLM, RAG, VLM, Multi-Modal). Tool Calling and AI Agent come after them and lead into the AIoT labs, where the tools become real (sensors, door).
 
 ### Integration (Labs 25 to 28)
 | Lab | Name |
