@@ -2,17 +2,18 @@
 
 Jetson Orin Nano Super 8 GB (JetPack 6.2). Three students share one Jetson. All labs are Jupyter notebooks with step-by-step tasks and check tasks.
 
-The course has three formal parts. Each part also has a short name that says what the student does.
+The course has four formal parts. Each part also has a short name that says what the student does.
 
 | Part | Formal name | By action | Labs | Status |
 |---|---|---|---|---|
-| 1 | Applied AI | **Use AI** | 0 to 26 | Built |
-| 2 | Fine-Tuning AI | **Adapt AI** | 27 to 29 | Proposed |
-| 3 | Machine Learning Fundamentals | **Build AI** | 30 to 35 | Proposed |
+| 1 | Foundations | **Get Ready** | 0 to 5 | Built |
+| 2 | Applied AI | **Use AI** | 6 to 26 | Built |
+| 3 | Fine-Tuning AI | **Adapt AI** | 27 to 29 | Proposed |
+| 4 | Machine Learning Fundamentals | **Build AI** | 30 to 35 | Proposed |
 
-## Part 1: Applied AI (Use AI), Labs 0 to 26
+## Part 1: Foundations (Get Ready), Labs 0 to 5
 
-### Foundations: Jetson and Linux (Labs 0 to 3)
+### Jetson and Linux (Labs 0 to 3)
 | Lab | Name |
 |---|---|
 | 0 | See It First: AI Vision Demo |
@@ -20,11 +21,13 @@ The course has three formal parts. Each part also has a short name that says wha
 | 2 | Ubuntu Linux Essentials (Part 1) |
 | 3 | Ubuntu Linux Essentials (Part 2) |
 
-### Foundations: Programming and GPU (Labs 4 to 5)
+### Programming and GPU (Labs 4 to 5)
 | Lab | Name |
 |---|---|
 | 4 | Python on Jetson |
 | 5 | NVIDIA CUDA with Python |
+
+## Part 2: Applied AI (Use AI), Labs 6 to 26
 
 ### Branch 1: Vision AI (Labs 6 to 15)
 | Lab | Name |
@@ -63,11 +66,11 @@ The course has three formal parts. Each part also has a short name that says wha
 | 25 | Sensor Streams, Anomaly Detection and a Live Dashboard |
 | 26 | Capstone: Your Own AIoT Application |
 
-Labs 14 and 17 are light training inside Part 1. Each should say: "You used training here. In Part 2 and Part 3 you learn how it works."
+Labs 14 and 17 are light training inside Part 2. Each should say: "You used training here. In Part 3 and Part 4 you learn how it works."
 
-## Part 2: Fine-Tuning AI (Adapt AI), Labs 27 to 29 (proposed)
+## Part 3: Fine-Tuning AI (Adapt AI), Labs 27 to 29 (proposed)
 
-The same three branches as Part 1, so students repeat the pattern they know.
+The same three branches as Part 2, so students repeat the pattern they know.
 
 | Lab | Branch | Idea | Open question |
 |---|---|---|---|
@@ -75,7 +78,7 @@ The same three branches as Part 1, so students repeat the pattern they know.
 | 28 | Speech | Fine-tune a small speech model on your own voice or accent | Not tested on 8 GB |
 | 29 | Language | LoRA fine-tune a tiny LLM on your own Q&A | May not fit in 8 GB shared memory; test first |
 
-## Part 3: Machine Learning Fundamentals (Build AI), Labs 30 to 35 (proposed)
+## Part 4: Machine Learning Fundamentals (Build AI), Labs 30 to 35 (proposed)
 
 | Lab | Idea |
 |---|---|
@@ -86,10 +89,10 @@ The same three branches as Part 1, so students repeat the pattern they know.
 | 34 | Overfitting, tuning and evaluation |
 | 35 | Machine Learning capstone |
 
-Each Part 3 lab opens with: "In Part 1 you used X. Now you build X."
+Each Part 4 lab opens with: "In Part 2 you used X. Now you build X."
 
 ## Decisions still open
-1. Keep Labs 14 and 17 in Part 1 as light training, or move them to Part 2 (needs renumbering).
+1. Keep Labs 14 and 17 in Part 2 as light training, or move them to Part 3 (needs renumbering).
 2. Whether Lab 29 (LLM fine-tuning) fits in 8 GB; if not, swap it for fine-tuning a small classifier.
-3. Lab numbers in Parts 2 and 3 are placeholders.
+3. Lab numbers in Parts 3 and 4 are placeholders.
 4. Not yet tested on hardware: camera, microphone, speaker, ESP32-S3.
