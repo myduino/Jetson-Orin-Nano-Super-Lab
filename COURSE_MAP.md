@@ -12,20 +12,24 @@ The course has three formal parts. Each part also has a short name that says wha
 
 ## Part 1: Applied AI (Use AI), Labs 0 to 26
 
-### Foundations (Labs 0 to 6)
+### Foundations: Jetson and Linux (Labs 0 to 3)
 | Lab | Name |
 |---|---|
 | 0 | See It First: AI Vision Demo |
 | 1 | Introduction to Jetson Orin Nano Super |
 | 2 | Ubuntu Linux Essentials (Part 1) |
 | 3 | Ubuntu Linux Essentials (Part 2) |
-| 4 | Python on Jetson |
-| 5 | NVIDIA CUDA with Python |
-| 6 | Image Processing with OpenCV |
 
-### Branch 1: Vision AI (Labs 7 to 15)
+### Foundations: Programming and GPU (Labs 4 to 5)
 | Lab | Name |
 |---|---|
+| 4 | Python on Jetson |
+| 5 | NVIDIA CUDA with Python |
+
+### Branch 1: Vision AI (Labs 6 to 15)
+| Lab | Name |
+|---|---|
+| 6 | Image Processing with OpenCV (images as numbers, before any AI) |
 | 7 | AI Vision and Inference |
 | 8 | Optimisation with TensorRT |
 | 9 | Mini Project: Object Counter with Alerts |
