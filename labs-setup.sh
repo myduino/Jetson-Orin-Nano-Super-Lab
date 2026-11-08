@@ -32,10 +32,24 @@ sed -i '/^alias lab=/d;/^alias jet=/d' ~/.bashrc 2>/dev/null
 rm -f ~/.lab_agent.json
 mkdir -p ~/myduino-jetson-lab
 
-echo "== 3. Power mode =="
+echo "== 3. Language model engine (llama.cpp, used by Labs 19 to 21) =="
+# Built once with CUDA for the GPU of the Orin Nano. It takes about 20 minutes. The version is fixed (the one the labs were tested with).
+# The model files are downloaded later by the first student, in Lab 19. Skipped when it is already built.
+LLAMA_COMMIT=12e9084dc1c88fe73bdd2886723b4b8b7d790be8
+if [ -x ~/llama.cpp/build/bin/llama-server ]; then
+  echo "llama-server is already built."
+else
+  sudo apt install -y cmake build-essential
+  if [ ! -d ~/llama.cpp/.git ]; then git init -q ~/llama.cpp && git -C ~/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp; fi
+  git -C ~/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT" && git -C ~/llama.cpp checkout -q FETCH_HEAD
+  (cd ~/llama.cpp && cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87 -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --config Release -j4 --target llama-server) || echo "llama.cpp did not build: run this script again, or ask the teacher."
+fi
+
+echo "== 4. Power mode =="
 command -v nvpmodel > /dev/null && sudo nvpmodel -m 2 && echo "Power mode: MAXN SUPER"
 
-echo "== 4. The lab agent =="
+echo "== 5. The lab agent =="
 printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/myduino-jetson-lab/.agent.json
 chmod 600 ~/myduino-jetson-lab/.agent.json
 sudo tee /etc/systemd/system/myduino-lab-agent.service > /dev/null <<UNIT
