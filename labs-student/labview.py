@@ -507,14 +507,33 @@ LLM_MODELS = {
     "qwen3.5-2b": {"hf": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/", "file": "Qwen3.5-2B-Q4_K_M.gguf",
                    "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3.5-2B-mmproj-F16.gguf",
                    "note": "the default: fast (about 33 tokens per second), sees pictures, about 4.2 GB of memory in use"},
-    "qwen3-vl-4b": {"hf": "https://huggingface.co/unsloth/Qwen3-VL-4B-Instruct-GGUF/resolve/main/", "file": "Qwen3-VL-4B-Instruct-Q4_K_M.gguf",
-                    "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3-VL-4B-mmproj-F16.gguf",
-                    "note": "best answers and counting, slower (about 18 tokens per second), about 6 GB in use: close other notebooks"},
     "lfm2.5-vl-1.6b": {"hf": "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/", "file": "LFM2.5-VL-1.6B-Q4_K_M.gguf",
                        "eyes": "mmproj-LFM2.5-VL-1.6b-Q8_0.gguf", "eyes_here": "LFM2.5-VL-1.6B-mmproj-Q8_0.gguf",
                        "note": "the smallest and fastest (about 59 tokens per second), about 2.7 GB in use, simpler answers"},
 }
 LLM_DEFAULT = "qwen3.5-2b"
+LLM_USE = os.path.join(LLM_DIR, ".llm_use")           # who asked the server last, and when (shared by the students of this Jetson)
+LLM_BUSY_SECONDS = 120                                 # a switch is refused while somebody else used the server in this time
+
+
+def _who():
+    """The name of the student of this notebook (from the folder: .../dka_4/<student>/labNN)."""
+    parts = os.getcwd().split(os.sep)
+    return parts[parts.index("dka_4") + 1] if "dka_4" in parts and parts.index("dka_4") + 1 < len(parts) else getpass.getuser()
+
+
+def _used_by_others():
+    """(name, seconds ago) of another student who used the server lately, else None."""
+    import json
+    try:
+        with open(LLM_USE) as f:
+            info = json.load(f)
+        ago = time.time() - info["time"]
+        if info["who"] != _who() and ago < LLM_BUSY_SECONDS:
+            return info["who"], ago
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
 
 
 def _llm(path, body=None, timeout=600):
@@ -597,10 +616,12 @@ def llm_download(model=LLM_DEFAULT, show=print):
         show(f"{name}: done")
 
 
-def llm_start(model=None, wait=90):
+def llm_start(model=None, wait=90, force=False):
     """Start the language model server (only ONE student per Jetson runs this; the others use the same server).
-    llm_start() starts the default model, or keeps the one that runs. llm_start("qwen3-vl-4b") switches the server to another
+    llm_start() starts the default model, or keeps the one that runs. llm_start("lfm2.5-vl-1.6b") switches the server to another
     model of llm_models(): this RESTARTS the server for all students of this Jetson (about 30 seconds), so tell your team first.
+    A switch is refused while a team mate used the server in the last 2 minutes (force=True switches anyway).
+    Only one model fits in the memory at a time.
     Then it prints the link of the chat page."""
     if model is not None and model not in LLM_MODELS:
         raise SystemExit(f"Unknown model {model!r}. Choose one of: {', '.join(LLM_MODELS)}")
@@ -609,6 +630,10 @@ def llm_start(model=None, wait=90):
         print(f"The server is already running ({now}). Chat page:", llm_link())
         return
     if now is not None:
+        other = _used_by_others()
+        if other and not force:
+            raise SystemExit(f"{other[0]} used the model {other[1]:.0f} s ago. Switching to {model} restarts it for everybody. "
+                             f"Ask {other[0]} to finish first, or run llm_start({model!r}, force=True).")
         print(f"Switching from {now} to {model}: the server restarts for everybody on this Jetson ...")
         llm_stop()
     model = model or LLM_DEFAULT
@@ -657,6 +682,11 @@ def llm_chat(messages, images=None, options=None, on_token=None):
             "chat_template_kwargs": {"enable_thinking": False}, **options}
     started = time.time()
     first, text, timings = None, "", {}
+    try:
+        with open(LLM_USE, "w") as f:
+            json.dump({"who": _who(), "time": started}, f)
+    except OSError:
+        pass
     with _llm("/v1/chat/completions", body) as answer:
         for line in answer:
             line = line.decode().strip()
