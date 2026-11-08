@@ -32,7 +32,7 @@ sed -i '/^alias lab=/d;/^alias jet=/d' ~/.bashrc 2>/dev/null
 rm -f ~/.lab_agent.json
 mkdir -p ~/myduino-jetson-lab
 
-echo "== 3. Language model engine (llama.cpp, used by Labs 19 to 21) =="
+echo "== 3. Language model engine (llama.cpp, used by Labs 19 to 22) =="
 # Built once with CUDA for the GPU of the Orin Nano. It takes about 20 minutes. The version is fixed (the one the labs were tested with).
 # The model files are downloaded later by the first student, in Lab 19. Skipped when it is already built.
 LLAMA_COMMIT=12e9084dc1c88fe73bdd2886723b4b8b7d790be8
