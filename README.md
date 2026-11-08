@@ -96,7 +96,7 @@ If you break something on a Jetson, delete the course folder and clone it again,
 | 7 to 9 | AI vision, TensorRT, mini project | |
 | 10 to 15 | Tracking, pose, segmentation and zones, OCR and QR, your own model, deploy and alarm | Camera |
 | 16 to 18 | Speech to text, keyword spotting, text to speech | USB microphone (the webcam microphone works) and a speaker |
-| 19 to 21 | Local chatbot, ask the camera, voice assistant | Uses Ollama; Lab 19 installs it |
+| 19 to 21 | Local chatbot, ask the camera, voice assistant | Uses llama.cpp (built by `labs-setup.sh`); one student per Jetson starts the server in Lab 19 and the others use it |
 | 22 to 24 | AIoT with the ESP32-S3 over MQTT, smart door, sensor streams and dashboard | The Jetson does the AI, the ESP32 does the IoT. A virtual ESP32 is built in, so the labs run before the board arrives. |
 | 25 | Capstone | |
 
