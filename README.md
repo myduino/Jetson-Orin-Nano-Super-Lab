@@ -104,4 +104,4 @@ The program for the ESP32-S3 is in `labs-student/esp32/` (`main.py` and `config.
 
 Tested on a Jetson Orin Nano Super with JetPack 6.2, Labs 0 to 9 (the earlier terminal version). Labs 19 to 22 (llama.cpp) were run cell by cell on a real Jetson, except the parts that need a camera, a microphone or a speaker. The teacher page, the agent and the notebook flow were tested with stand-ins and have not run on real hardware yet.
 
-The new Labs 10 to 26 have been tested only with simulations (a fake MQTT broker, a virtual ESP32, synthetic sounds and pictures). They have not yet run on the Jetson with a real microphone, an ESP32 board and the downloaded models.
+The other new labs (10 to 18 and 23 to 26) have been tested only with simulations (a fake MQTT broker, a virtual ESP32, synthetic sounds and pictures). They have not yet run on the Jetson with a real microphone, an ESP32 board and the downloaded models.
