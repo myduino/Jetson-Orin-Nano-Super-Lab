@@ -4,7 +4,7 @@ import time
 import cv2
 
 # ---------------- Settings ----------------
-MODEL = "yolo26n_fp16.engine"   # fast model (made in Lab 8). Falls back to yolo26n.pt
+MODEL = "yolo26n_fp16.engine"   # fast model (made in Lab 15). Falls back to yolo26n.pt
 CHALLENGE_SECONDS = 60          # length of the game
 CONFIDENCE = 0.40               # how sure the model must be (the slider changes it)
 # ------------------------------------------
@@ -14,7 +14,7 @@ device = "cpu"
 
 
 def find_model():
-    """Your own engine from Lab 8 if you have one, else the plain model from your models folder."""
+    """Your own engine from Lab 15 if you have one, else the plain model from your models folder."""
     home = os.environ.get("LAB_HOME", "")
     for path in (MODEL, os.path.join(home, "lab8", MODEL), os.path.join(home, "models", "yolo26n.pt"), "yolo26n.pt"):
         if os.path.exists(path):
