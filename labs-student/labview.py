@@ -506,10 +506,10 @@ LLM_LOG = os.path.expanduser("~/llama-server.log")
 LLM_MODELS = {
     "qwen3.5-2b": {"hf": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/", "file": "Qwen3.5-2B-Q4_K_M.gguf",
                    "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3.5-2B-mmproj-F16.gguf",
-                   "note": "the default: fast (about 33 tokens per second), sees pictures, about 4.2 GB of memory in use"},
+                   "note": "the default: fast (about 33 tokens per second), about 3.2 GB of memory in use (4.2 GB with the eyes)"},
     "lfm2.5-vl-1.6b": {"hf": "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/", "file": "LFM2.5-VL-1.6B-Q4_K_M.gguf",
                        "eyes": "mmproj-LFM2.5-VL-1.6b-Q8_0.gguf", "eyes_here": "LFM2.5-VL-1.6B-mmproj-Q8_0.gguf",
-                       "note": "the smallest and fastest (about 59 tokens per second), about 2.7 GB in use, simpler answers"},
+                       "note": "the smallest and fastest (about 59 tokens per second), about 2.4 GB in use (2.7 GB with the eyes), simpler answers"},
 }
 LLM_DEFAULT = "qwen3.5-2b"
 LLM_USE = os.path.join(LLM_DIR, ".llm_use")           # who asked the server last, and when (shared by the students of this Jetson)
@@ -575,35 +575,51 @@ def llm_link():
 
 
 def llm_models():
-    """Print the models that you can choose, and which one runs now."""
+    """Print the models that you can choose, and which one runs now (with or without the eyes)."""
     now = llm_current()
     for name, info in LLM_MODELS.items():
         print(f"{'>' if name == now else ' '} {name:<16} {info['note']}")
-    print("The server runs:", now or "(not started)")
+    if now is None:
+        print("The server runs: (not started)")
+    else:
+        print(f"The server runs: {now}, {'WITH the eyes (pictures)' if llm_vision() else 'text only'}")
+
+
+def _props():
+    import json
+    import urllib.request
+    try:
+        with urllib.request.urlopen(LLM_URL + "/props", timeout=5) as answer:
+            return json.load(answer)
+    except Exception:
+        return {}
 
 
 def llm_current():
     """The name of the model that the server runs now (None when the server is not running)."""
-    import json
-    import urllib.request
     if not llm_ready():
         return None
-    try:
-        with urllib.request.urlopen(LLM_URL + "/props", timeout=5) as answer:
-            path = json.load(answer).get("model_path", "")
-        for name, info in LLM_MODELS.items():
-            if os.path.basename(path) == info["file"]:
-                return name
-    except Exception:
-        pass
+    path = _props().get("model_path", "")
+    for name, info in LLM_MODELS.items():
+        if os.path.basename(path) == info["file"]:
+            return name
     return "(unknown)"
 
 
-def llm_download(model=LLM_DEFAULT, show=print):
-    """Download the files of a model (only one student per Jetson needs to; a file that is already here is skipped)."""
+def llm_vision():
+    """True when the server runs with the eyes (it accepts pictures), False when it is text only, None when it is not running."""
+    if not llm_ready():
+        return None
+    return bool(_props().get("modalities", {}).get("vision"))
+
+
+def llm_download(model=LLM_DEFAULT, vision=False, show=print):
+    """Download the files of a model (only one student per Jetson needs to; a file that is already here is skipped).
+    The eyes file is downloaded only with vision=True."""
     info = LLM_MODELS[model]
     os.makedirs(LLM_DIR, exist_ok=True)
-    for name, remote in ((info["file"], info["file"]), (info["eyes_here"], info["eyes"])):
+    files = [(info["file"], info["file"])] + ([(info["eyes_here"], info["eyes"])] if vision else [])
+    for name, remote in files:
         path = os.path.join(LLM_DIR, name)
         if os.path.exists(path) and not os.path.exists(path + ".part"):
             show(f"{name}: already here")
@@ -616,40 +632,46 @@ def llm_download(model=LLM_DEFAULT, show=print):
         show(f"{name}: done")
 
 
-def llm_start(model=None, wait=90, force=False):
+def llm_start(model=None, vision=None, wait=90, force=False):
     """Start the language model server (only ONE student per Jetson runs this; the others use the same server).
-    llm_start() starts the default model, or keeps the one that runs. llm_start("lfm2.5-vl-1.6b") switches the server to another
-    model of llm_models(): this RESTARTS the server for all students of this Jetson (about 30 seconds), so tell your team first.
-    A switch is refused while a team mate used the server in the last 2 minutes (force=True switches anyway).
-    Only one model fits in the memory at a time.
-    Then it prints the link of the chat page."""
+    llm_start() starts the default model as TEXT ONLY (about 3.2 GB of memory), or keeps what runs.
+    llm_start(vision=True) loads the model WITH the eyes (pictures, about 1 GB more). llm_start("lfm2.5-vl-1.6b") switches the model.
+    A change RESTARTS the server for all students of this Jetson (about 30 seconds), so tell your team first.
+    It is refused while a team mate used the server in the last 2 minutes (force=True changes it anyway).
+    Only one model fits in the memory at a time. Then it prints the link of the chat page."""
     if model is not None and model not in LLM_MODELS:
         raise SystemExit(f"Unknown model {model!r}. Choose one of: {', '.join(LLM_MODELS)}")
-    now = llm_current()
-    if now is not None and model in (None, now):
-        print(f"The server is already running ({now}). Chat page:", llm_link())
+    now, eyes = llm_current(), llm_vision()
+    if now is not None and model in (None, now) and vision in (None, eyes):
+        print(f"The server is already running ({now}, {'with the eyes' if eyes else 'text only'}). Chat page:", llm_link())
         return
+    if model is None:
+        model = LLM_DEFAULT if now is None else now
+    if vision is None:
+        vision = bool(eyes)
     if now is not None:
         other = _used_by_others()
         if other and not force:
-            raise SystemExit(f"{other[0]} used the model {other[1]:.0f} s ago. Switching to {model} restarts it for everybody. "
-                             f"Ask {other[0]} to finish first, or run llm_start({model!r}, force=True).")
-        print(f"Switching from {now} to {model}: the server restarts for everybody on this Jetson ...")
+            raise SystemExit(f"{other[0]} used the model {other[1]:.0f} s ago. Changing it restarts it for everybody. "
+                             f"Ask {other[0]} to finish first, or add force=True.")
+        print(f"Restarting the server as {model} ({'with the eyes' if vision else 'text only'}): everybody on this Jetson waits about 30 s ...")
         llm_stop()
-    model = model or LLM_DEFAULT
     info = LLM_MODELS[model]
     if not os.path.exists(LLM_SERVER):
         raise SystemExit("llama-server is not built on this Jetson (ask the teacher to run labs-setup.sh).")
-    llm_download(model)
-    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]), "--mmproj", os.path.join(LLM_DIR, info["eyes_here"]),
+    llm_download(model, vision)
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]),
                "-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja",   # -lm none: load into the GPU memory directly (the default can run out of memory here)
                "--host", "0.0.0.0", "--port", str(LLM_PORT)]
+    if vision:
+        command += ["--mmproj", os.path.join(LLM_DIR, info["eyes_here"])]
     log = open(LLM_LOG, "w")
     subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)   # keeps running after the notebook
     started = time.time()
     while time.time() - started < wait:
         if llm_ready():
-            print(f"{model} ready after {time.time() - started:.0f} s. Chat page: {llm_link()}  (give this link to your team)")
+            print(f"{model} ({'with the eyes' if vision else 'text only'}) ready after {time.time() - started:.0f} s. "
+                  f"Chat page: {llm_link()}  (give this link to your team)")
             return
         time.sleep(2)
     raise SystemExit("The server did not start in time. Look at the end of " + LLM_LOG + " (!tail -20 ~/llama-server.log)")
@@ -672,6 +694,9 @@ def llm_chat(messages, images=None, options=None, on_token=None):
     import json
     messages = [dict(m) for m in messages]
     if images:
+        if not llm_vision():
+            raise SystemExit("The server runs text only, so it cannot see pictures. One student runs  labview.llm_start(vision=True)  "
+                             "(it restarts the server for the team, about 30 seconds).")
         parts = [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(i).decode()}}
                  for i in images]
         messages[-1]["content"] = parts + [{"type": "text", "text": messages[-1]["content"]}]
