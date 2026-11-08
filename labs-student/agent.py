@@ -10,6 +10,7 @@ their folder (.venv), made by the agent the first time. Only the Python standard
 """
 import base64
 import glob
+import hashlib
 import json
 import os
 import re
@@ -146,17 +147,50 @@ def prepare(home):
         with open(pth, "w") as f:
             f.write(os.path.join(HERE, "labs-student") + "\n")
     shutil.copyfile(os.path.join(HERE, "labs-student", "start_here.ipynb"), os.path.join(home, "Start_Here.ipynb"))
+    sync_notebooks(home)
+
+
+def file_hash(path):
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+
+def sync_notebooks(home):
+    """Gives the student the notebooks of the course. A new lab is copied. A notebook the student never changed is replaced by the newer
+    version of the course. A notebook the student changed is kept as it is, and the newer version is added next to it as "<name> (new).ipynb"."""
     labs = os.path.join(HERE, "labs-student")
+    book = os.path.join(home, ".delivered.json")                   # what the student was given: file -> {"sent": hash of that version, "new": hash of the newer version put next to it}
+    try:
+        given = json.load(open(book))
+    except (OSError, ValueError):
+        given = {}
     for folder in sorted(os.listdir(labs)):
         m = re.match(r"lab(\d{1,2})_", folder)
         if not m or not os.path.isdir(os.path.join(labs, folder)):
             continue
         for f in os.listdir(os.path.join(labs, folder)):
-            if f.endswith(".ipynb"):
-                dest = os.path.join(home, f"lab{m.group(1)}", f)
-                if not os.path.exists(dest):                               # never overwrite a student's copy
-                    shutil.copyfile(os.path.join(labs, folder, f), dest)
-
+            if not f.endswith(".ipynb"):
+                continue
+            src, dest = os.path.join(labs, folder, f), os.path.join(home, f"lab{m.group(1)}", f)
+            rel = f"lab{m.group(1)}/{f}"
+            new, rec = file_hash(src), given.get(rel, {})
+            if not os.path.exists(dest):
+                shutil.copyfile(src, dest)
+                given[rel] = {"sent": new}
+            elif file_hash(dest) == new:
+                given[rel] = {"sent": new}                          # the student has the current version
+            elif rec.get("sent") and file_hash(dest) == rec["sent"]:
+                shutil.copyfile(src, dest)                          # never changed by the student: the newer version replaces it
+                given[rel] = {"sent": new}
+            elif rec.get("new") != new:
+                shutil.copyfile(src, dest[:-6] + " (new).ipynb")    # changed by the student: their work stays, the newer version comes next to it
+                given[rel] = {**rec, "new": new}
+    tmp = book + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(given, f)
+    os.replace(tmp, book)
 
 def student_env(home, cls, camera_device, pin=None, mqtt_port=None, lab=None):
     env = dict(os.environ)
@@ -440,6 +474,17 @@ def progress_report():
 
 
 # ---------------------------------------------------------------- talking to the teacher server
+def course_version():
+    """The commit of the course folder on this Jetson (the teacher compares it with the newest one on GitHub)."""
+    try:
+        head = read(os.path.join(HERE, ".git", "HEAD")).strip()
+        if head.startswith("ref:"):
+            head = read(os.path.join(HERE, ".git", head[4:].strip())).strip()
+        return head[:40]
+    except Exception:
+        return ""
+
+
 def hello(cfg):
     global progress_at, progress_last
     host, _, _ = cfg["teacher"].partition(":")
@@ -449,8 +494,8 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": MQTT_HOST[0], "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True,
-        "note": next(iter(m for _, m in failed.values()), "") or ("MQTT is not installed on this Jetson. Click Set Up Again." if running and not mqtt_ready() else "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
+        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True, "course": course_version(),
+        "note": next(iter(m for _, m in failed.values()), "") or ("MQTT is not installed on this Jetson. Click Update on the Jetsons page." if running and not mqtt_ready() else "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json", "X-Key": cfg["key"]})
