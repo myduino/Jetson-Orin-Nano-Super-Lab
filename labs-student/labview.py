@@ -501,11 +501,20 @@ LLM_PORT = 8080
 LLM_DIR = os.path.expanduser("~/models")
 LLM_SERVER = os.path.expanduser("~/llama.cpp/build/bin/llama-server")
 LLM_LOG = os.path.expanduser("~/llama-server.log")
-# The model of the labs (Q4_K_M = 4 bit, about 1.3 GB) and its "eyes" file (the mmproj) for pictures.
-LLM_HF = "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/"
-LLM_FILE = "Qwen3.5-2B-Q4_K_M.gguf"
-LLM_EYES = "mmproj-F16.gguf"                         # the name on the web site
-LLM_EYES_HERE = "Qwen3.5-2B-mmproj-F16.gguf"          # the name on this Jetson (each model has its own)
+# The models of the labs (Q4_K_M = 4 bit). Each has its main file and its "eyes" file (the mmproj) for pictures.
+# "hf" is the web address of the files, "eyes" the name of the eyes file there, "eyes_here" its name on this Jetson.
+LLM_MODELS = {
+    "qwen3.5-2b": {"hf": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/", "file": "Qwen3.5-2B-Q4_K_M.gguf",
+                   "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3.5-2B-mmproj-F16.gguf",
+                   "note": "the default: fast (about 33 tokens per second), sees pictures, about 4.2 GB of memory in use"},
+    "qwen3-vl-4b": {"hf": "https://huggingface.co/unsloth/Qwen3-VL-4B-Instruct-GGUF/resolve/main/", "file": "Qwen3-VL-4B-Instruct-Q4_K_M.gguf",
+                    "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3-VL-4B-mmproj-F16.gguf",
+                    "note": "best answers and counting, slower (about 18 tokens per second), about 6 GB in use: close other notebooks"},
+    "lfm2.5-vl-1.6b": {"hf": "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/", "file": "LFM2.5-VL-1.6B-Q4_K_M.gguf",
+                       "eyes": "mmproj-LFM2.5-VL-1.6b-Q8_0.gguf", "eyes_here": "LFM2.5-VL-1.6B-mmproj-Q8_0.gguf",
+                       "note": "the smallest and fastest (about 59 tokens per second), about 2.7 GB in use, simpler answers"},
+}
+LLM_DEFAULT = "qwen3.5-2b"
 
 
 def _llm(path, body=None, timeout=600):
@@ -546,48 +555,88 @@ def llm_link():
     return f"http://{ip}:{LLM_PORT}"
 
 
-def llm_download(show=print):
-    """Download the model files (only one student per Jetson needs to; a file that is already here is skipped)."""
+def llm_models():
+    """Print the models that you can choose, and which one runs now."""
+    now = llm_current()
+    for name, info in LLM_MODELS.items():
+        print(f"{'>' if name == now else ' '} {name:<16} {info['note']}")
+    print("The server runs:", now or "(not started)")
+
+
+def llm_current():
+    """The name of the model that the server runs now (None when the server is not running)."""
+    import json
+    import urllib.request
+    if not llm_ready():
+        return None
+    try:
+        with urllib.request.urlopen(LLM_URL + "/props", timeout=5) as answer:
+            path = json.load(answer).get("model_path", "")
+        for name, info in LLM_MODELS.items():
+            if os.path.basename(path) == info["file"]:
+                return name
+    except Exception:
+        pass
+    return "(unknown)"
+
+
+def llm_download(model=LLM_DEFAULT, show=print):
+    """Download the files of a model (only one student per Jetson needs to; a file that is already here is skipped)."""
+    info = LLM_MODELS[model]
     os.makedirs(LLM_DIR, exist_ok=True)
-    for name, remote in ((LLM_FILE, LLM_FILE), (LLM_EYES_HERE, LLM_EYES)):
+    for name, remote in ((info["file"], info["file"]), (info["eyes_here"], info["eyes"])):
         path = os.path.join(LLM_DIR, name)
         if os.path.exists(path) and not os.path.exists(path + ".part"):
             show(f"{name}: already here")
             continue
         show(f"{name}: downloading (a few minutes)...")
-        command = ["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", LLM_HF + remote]
+        command = ["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", info["hf"] + remote]
         if subprocess.run(command).returncode != 0:
             raise SystemExit(f"Download of {name} failed. Check the network and run this cell again (it continues where it stopped).")
         os.replace(path + ".part", path)
         show(f"{name}: done")
 
 
-def llm_start(wait=60):
+def llm_start(model=None, wait=90):
     """Start the language model server (only ONE student per Jetson runs this; the others use the same server).
-    Skips itself when the server is already running. Then prints the link of the chat page."""
-    if llm_ready():
-        print("The server is already running. Chat page:", llm_link())
+    llm_start() starts the default model, or keeps the one that runs. llm_start("qwen3-vl-4b") switches the server to another
+    model of llm_models(): this RESTARTS the server for all students of this Jetson (about 30 seconds), so tell your team first.
+    Then it prints the link of the chat page."""
+    if model is not None and model not in LLM_MODELS:
+        raise SystemExit(f"Unknown model {model!r}. Choose one of: {', '.join(LLM_MODELS)}")
+    now = llm_current()
+    if now is not None and model in (None, now):
+        print(f"The server is already running ({now}). Chat page:", llm_link())
         return
+    if now is not None:
+        print(f"Switching from {now} to {model}: the server restarts for everybody on this Jetson ...")
+        llm_stop()
+    model = model or LLM_DEFAULT
+    info = LLM_MODELS[model]
     if not os.path.exists(LLM_SERVER):
         raise SystemExit("llama-server is not built on this Jetson (ask the teacher to run labs-setup.sh).")
-    llm_download()
-    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, LLM_FILE), "--mmproj", os.path.join(LLM_DIR, LLM_EYES_HERE),
+    llm_download(model)
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]), "--mmproj", os.path.join(LLM_DIR, info["eyes_here"]),
                "-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja",   # -lm none: load into the GPU memory directly (the default can run out of memory here)
-                "--host", "0.0.0.0", "--port", str(LLM_PORT)]
+               "--host", "0.0.0.0", "--port", str(LLM_PORT)]
     log = open(LLM_LOG, "w")
     subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)   # keeps running after the notebook
     started = time.time()
     while time.time() - started < wait:
         if llm_ready():
-            print(f"Ready after {time.time() - started:.0f} s. Chat page: {llm_link()}  (give this link to your team)")
+            print(f"{model} ready after {time.time() - started:.0f} s. Chat page: {llm_link()}  (give this link to your team)")
             return
         time.sleep(2)
     raise SystemExit("The server did not start in time. Look at the end of " + LLM_LOG + " (!tail -20 ~/llama-server.log)")
 
 
 def llm_stop():
-    """Stop the language model server (frees about 3 GB of memory)."""
-    subprocess.run(["pkill", "-f", "llama-server"])
+    """Stop the language model server (frees 2 to 4 GB of memory). Waits until it has really stopped."""
+    subprocess.run(["pkill", "-x", "llama-server"])
+    for _ in range(30):
+        if not llm_ready() and subprocess.run(["pgrep", "-x", "llama-server"], capture_output=True).returncode != 0:
+            return
+        time.sleep(1)
 
 
 def llm_chat(messages, images=None, options=None, on_token=None):
