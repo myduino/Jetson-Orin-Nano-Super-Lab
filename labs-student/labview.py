@@ -734,6 +734,30 @@ def llm_chat(messages, images=None, options=None, on_token=None):
             "tokens_per_s": timings.get("predicted_per_second", 0.0), "total_s": time.time() - started}
 
 
+def llm_message(messages, tools=None, options=None):
+    """Ask the language model for ONE complete answer (not streamed). Use it for tool calling.
+    messages: the conversation. tools (optional): a list of tool descriptions. A tool call comes back in message["tool_calls"].
+    Returns a dict: message (the answer, with "content" and maybe "tool_calls"), finish ("stop" or "tool_calls"), total_s."""
+    import json
+    options = dict(options or {})
+    body = {"messages": [dict(m) for m in messages], "stream": False, "temperature": 0.0, "max_tokens": 400,
+            "chat_template_kwargs": {"enable_thinking": False}, **options}
+    if tools:
+        body["tools"] = tools
+    started = time.time()
+    try:
+        with open(LLM_USE, "w") as f:
+            json.dump({"who": _who(), "time": started}, f)
+    except OSError:
+        pass
+    with _llm("/v1/chat/completions", body) as answer:
+        info = json.loads(answer.read())
+    if info.get("error"):
+        raise SystemExit("The model says: " + str(info["error"]))
+    choice = info["choices"][0]
+    return {"message": choice["message"], "finish": choice.get("finish_reason"), "total_s": time.time() - started}
+
+
 # ---------------------------------------------------------------- sudo in notebooks
 def sudo_login():
     """Ask for your password once (it is not shown and not saved in the notebook).
