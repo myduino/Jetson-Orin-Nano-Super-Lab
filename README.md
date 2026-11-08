@@ -81,8 +81,6 @@ The course has four parts and 41 labs (Lab 0 to Lab 40). The full list, with wha
 
 If you break something on a Jetson, delete the course folder and clone it again, then run `labs-setup.sh` again. The student folders (with their environments) are in `~/myduino-jetson-lab` and are not touched.
 
-## Status
-
 ## The labs
 
 | Labs | Topic | Notes |
