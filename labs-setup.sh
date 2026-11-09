@@ -33,17 +33,19 @@ rm -f ~/.lab_agent.json
 mkdir -p ~/myduino-jetson-lab
 
 echo "== 3. Language model engine (llama.cpp, used by Labs 20 to 27) =="
-# Built once with CUDA for the GPU of the Orin Nano. It takes about 20 minutes. The version is fixed (the one the labs were tested with).
-# The model files are downloaded later by the first student, in Lab 20. Skipped when it is already built.
-LLAMA_COMMIT=12e9084dc1c88fe73bdd2886723b4b8b7d790be8
-if [ -x ~/llama.cpp/build/bin/llama-server ]; then
-  echo "llama-server is already built."
+# Built once with CUDA for the GPU of the Orin Nano. It takes about 20 minutes. The version is fixed (v0.9.0, the one the labs were tested with):
+# it has the speech endpoint /tts that Labs 22 and 23 use. GGML_CUDA_NO_VMM stops a GPU memory error of the audio models on this board.
+# The model files are downloaded later by the first student, in Lab 20. Skipped when this version is already built.
+LLAMA_COMMIT=cd959bae99ff4bed22bef2604f45241c09bbb8c8
+if [ -x ~/llama.cpp/build/bin/llama-server ] && [ "$(cat ~/llama.cpp/.myduino_build 2>/dev/null)" = "$LLAMA_COMMIT" ]; then
+  echo "llama-server is already built (v0.9.0)."
 else
   sudo apt install -y cmake build-essential
   if [ ! -d ~/llama.cpp/.git ]; then git init -q ~/llama.cpp && git -C ~/llama.cpp remote add origin https://github.com/ggml-org/llama.cpp; fi
   git -C ~/llama.cpp fetch --depth 1 origin "$LLAMA_COMMIT" && git -C ~/llama.cpp checkout -q FETCH_HEAD
-  (cd ~/llama.cpp && cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87 -DCMAKE_BUILD_TYPE=Release \
-    && cmake --build build --config Release -j4 --target llama-server) || echo "llama.cpp did not build: run this script again, or ask the teacher."
+  (cd ~/llama.cpp && cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DCMAKE_CUDA_ARCHITECTURES=87 -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --config Release -j4 --target llama-server \
+    && echo "$LLAMA_COMMIT" > .myduino_build) || echo "llama.cpp did not build: run this script again, or ask the teacher."
 fi
 
 echo "== 4. Power mode =="
