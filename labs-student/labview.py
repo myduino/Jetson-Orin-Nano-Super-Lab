@@ -674,6 +674,9 @@ def llm_start(model=None, vision=None, wait=90, force=False):
     Only one model fits in the memory at a time. Then it prints the link of the chat page."""
     if model is not None and model not in LLM_MODELS:
         raise SystemExit(f"Unknown model {model!r}. Choose one of: {', '.join(LLM_MODELS)}")
+    if alm_ready():                                                          # the audio server and a text model do not fit together
+        print("Stopping the audio server of Lab 22 first ...")
+        llm_stop()
     now, eyes = llm_current(), llm_vision()
     if now is not None and model in (None, now) and vision in (None, eyes):
         print(f"The server is already running ({now}, {'with the eyes' if eyes else 'text only'}). Chat page:", llm_link())
@@ -783,6 +786,133 @@ def embed(texts, kind="document"):
     with urllib.request.urlopen(request, timeout=60) as answer:
         vectors = np.array([d["embedding"] for d in json.load(answer)["data"]], dtype=float)
     return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
+
+
+# ---------------------------------------------------------------- audio language model (LFM3-Audio on llama.cpp: speech in, speech out)
+ALM_URL = "http://127.0.0.1:8083"
+ALM_PORT = 8083
+ALM_HF = "https://huggingface.co/LiquidAI/LFM3-Audio-2B-GGUF/resolve/main/"
+ALM_FILE = "LFM3-Audio-2B-Q4_K_M.gguf"                      # the language model (1.1 GB) ...
+ALM_EARS = "mmproj-LFM3-Audio-2B-Q8_0.gguf"                 # ... and its ears and voice (0.3 GB): the audio encoder and the speech decoder
+ALM_TTS = os.path.join(JETSON_HOME, "llama.cpp", "build", "bin", "llama-tts")
+ALM_LOG = os.path.join(JETSON_HOME, "audio-server.log")
+
+
+def alm_ready():
+    """True when the audio language model server answers."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(ALM_URL + "/health", timeout=2) as answer:
+            return answer.status == 200
+    except Exception:
+        return False
+
+
+def alm_start(wait=120):
+    """Start the audio language model server (LFM3-Audio, about 1.4 GB of memory). Only one student per Jetson does this.
+    The text model of Lab 20 must be stopped first (labview.llm_stop()): both together do not fit in the memory."""
+    if alm_ready():
+        print("The audio server is already running.")
+        return
+    if llm_ready():
+        raise SystemExit("The text model is running and the memory is not enough for both. Tell your team, then run  labview.llm_stop()  "
+                         "and start this cell again. Afterwards labview.llm_start() brings the text model back.")
+    os.makedirs(LLM_DIR, exist_ok=True)
+    for name in (ALM_FILE, ALM_EARS):
+        path = os.path.join(LLM_DIR, name)
+        if os.path.exists(path) and not os.path.exists(path + ".part"):
+            _drop_cache(path)
+            continue
+        print(f"{name}: downloading (a few minutes, only the first time)...")
+        if subprocess.run(["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", ALM_HF + name]).returncode != 0:
+            raise SystemExit(f"Download of {name} failed. Check the network and run this cell again (it continues where it stopped).")
+        os.replace(path + ".part", path)
+        _drop_cache(path)
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, ALM_FILE), "--mmproj", os.path.join(LLM_DIR, ALM_EARS), "-ngl", "99", "-c", "1024",
+               "-b", "256", "-ub", "128", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--jinja", "--host", "127.0.0.1", "--port", str(ALM_PORT)]
+    # a short context and small batches keep the GPU memory low, so that llama-tts (speech out) can run next to this server
+    subprocess.Popen(command, stdout=open(ALM_LOG, "w"), stderr=subprocess.STDOUT, start_new_session=True)
+    started = time.time()
+    while time.time() - started < wait:
+        if alm_ready():
+            print(f"Audio server ready after {time.time() - started:.0f} s.")
+            return
+        time.sleep(2)
+    raise SystemExit("The audio server did not start in time. Look at the end of " + ALM_LOG + " (!tail -20 ~/audio-server.log)")
+
+
+def alm_stop():
+    """Stop the audio language model server (frees about 1.4 GB). The text model server, if it runs, is stopped too."""
+    llm_stop()
+
+
+def alm_listen(sound, system="Perform ASR.", question=None, max_tokens=150):
+    """Give a sound to the audio model. sound is a numpy array (as labview.record returns) or the path of a WAV file.
+    With the system prompt "Perform ASR." the answer is what was said. With another system prompt (and question=None) the model
+    answers the spoken question. Returns a dict: text, seconds (time it took), audio_seconds, rtf (seconds / audio_seconds)."""
+    import base64
+    import json
+    import tempfile
+    import urllib.request
+    path = sound
+    if not isinstance(sound, str):
+        path = tempfile.mktemp(suffix=".wav", dir=os.environ.get("TMPDIR"))
+        save_wav(sound, path)
+    wav = open(path, "rb").read()
+    if not isinstance(sound, str):
+        os.remove(path)
+    parts = [{"type": "input_audio", "input_audio": {"data": base64.b64encode(wav).decode(), "format": "wav"}}]
+    if question:
+        parts = [{"type": "text", "text": question}] + parts
+    body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": parts}], "temperature": 0, "max_tokens": max_tokens}
+    started = time.time()
+    request = urllib.request.Request(ALM_URL + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as answer:
+            text = json.load(answer)["choices"][0]["message"]["content"].strip()
+    except OSError as problem:
+        raise SystemExit(f"Cannot reach the audio server at {ALM_URL} ({problem}). Run  labview.alm_start()  (one student per Jetson).")
+    took = time.time() - started
+    seconds = (len(wav) - 44) / 2 / 16000
+    return {"text": text, "seconds": took, "audio_seconds": seconds, "rtf": took / max(seconds, 0.01)}
+
+
+def alm_ask(text, system="Answer in one short sentence.", max_tokens=150):
+    """Give the audio model a TEXT question (no sound). Returns a dict: text, seconds."""
+    import json
+    import urllib.request
+    body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": text}], "temperature": 0, "max_tokens": max_tokens}
+    started = time.time()
+    request = urllib.request.Request(ALM_URL + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=120) as answer:
+            reply = json.load(answer)["choices"][0]["message"]["content"].strip()
+    except OSError as problem:
+        raise SystemExit(f"Cannot reach the audio server at {ALM_URL} ({problem}). Run  labview.alm_start()  (one student per Jetson).")
+    return {"text": reply, "seconds": time.time() - started}
+
+
+def alm_speak(text, path="speech.wav", voice="female", lang="en"):
+    """Turn text into speech with the voice of the audio model and save it as a WAV file (24 000 Hz). voice: "female" or "male".
+    lang: a language code such as en, fr, es, de, ja. Returns the seconds it took (it loads the model each time, so it is slow)."""
+    if not os.path.exists(ALM_TTS):
+        raise SystemExit("llama-tts is not built on this Jetson (ask the teacher to run labs-setup.sh).")
+    base = [ALM_TTS, "-m", os.path.join(LLM_DIR, ALM_FILE), "-mm", os.path.join(LLM_DIR, ALM_EARS), "-ngl", "99"]
+    tail = ["-p", text, "--tts-voice", voice, "--tts-lang", lang, "-o", path]
+    # The GPU memory is tight when the audio server runs too: small settings first, then smaller ones that use the CPU for the speech decoder.
+    settings = [["-c", "512", "-b", "64", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on"],
+                ["-c", "256", "-b", "32", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--no-mmproj-offload"]]
+    started = time.time()
+    result = None
+    for options in settings:
+        if os.path.exists(path):
+            os.remove(path)                                    # an old file must not look like a success
+        result = subprocess.run(base + options + tail, capture_output=True, text=True)
+        if result.returncode == 0 and os.path.exists(path):
+            break
+    else:
+        raise SystemExit("llama-tts failed. If it says out of memory, close other notebooks and try again. " + (result.stderr or result.stdout)[-300:])
+    return time.time() - started
 
 
 def llm_chat(messages, images=None, options=None, on_token=None):
