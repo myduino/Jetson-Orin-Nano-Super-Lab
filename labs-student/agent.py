@@ -524,6 +524,43 @@ def course_version():
         return ""
 
 
+_cpu_last = [None]
+
+
+def stats():
+    """CPU, GPU, memory, disk and temperature of this Jetson, for the teacher's Jetsons page. Anything unreadable is left out."""
+    out = {}
+    try:
+        f = [int(x) for x in read("/proc/stat").split("\n", 1)[0].split()[1:]]
+        total, idle = sum(f), f[3] + f[4]
+        last, _cpu_last[0] = _cpu_last[0], (total, idle)
+        if last and total > last[0]:
+            out["cpu"] = round(100 * (1 - (idle - last[1]) / (total - last[0])))
+    except Exception:
+        pass
+    for p in ("/sys/devices/platform/gpu.0/load", "/sys/devices/platform/bus@0/17000000.gpu/load"):
+        try:
+            out["gpu"] = round(int(read(p).strip()) / 10)
+            break
+        except Exception:
+            pass
+    try:
+        m = {k: int(v.split()[0]) for k, v in (l.split(":", 1) for l in read("/proc/meminfo").splitlines() if ":" in l)}
+        out["ram"] = [round((m["MemTotal"] - m["MemAvailable"]) / 1048576, 1), round(m["MemTotal"] / 1048576, 1)]      # GB used, GB total
+    except Exception:
+        pass
+    try:
+        d = shutil.disk_usage(os.path.expanduser("~"))
+        out["disk"] = [round(d.used / 1e9), round(d.total / 1e9)]
+    except Exception:
+        pass
+    try:
+        out["temp"] = round(int(read("/sys/class/thermal/thermal_zone0/temp").strip()) / 1000)
+    except Exception:
+        pass
+    return out
+
+
 def hello(cfg):
     global progress_at, progress_last
     host, _, _ = cfg["teacher"].partition(":")
@@ -533,7 +570,7 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": MQTT_HOST[0], "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True, "course": course_version(),
+        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True, "course": course_version(), "stats": stats(),
         "note": next(iter(m for _, m in failed.values()), "") or ("MQTT is not installed on this Jetson. Click Update on the Jetsons page." if running and not mqtt_ready() else "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
