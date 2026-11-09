@@ -693,12 +693,74 @@ def llm_start(model=None, vision=None, wait=90, force=False):
 
 
 def llm_stop():
-    """Stop the language model server (frees 2 to 4 GB of memory). Waits until it has really stopped."""
+    """Stop the language model server (frees 2 to 4 GB of memory). Waits until it has really stopped.
+    The small embedding server stops too; embed() starts it again when needed."""
     subprocess.run(["pkill", "-x", "llama-server"])
     for _ in range(30):
         if not llm_ready() and subprocess.run(["pgrep", "-x", "llama-server"], capture_output=True).returncode != 0:
             return
         time.sleep(1)
+
+
+# ---------------------------------------------------------------- text embeddings (a second, small llama.cpp server)
+EMB_URL = "http://127.0.0.1:8082"
+EMB_PORT = 8082
+EMB_HF = "https://huggingface.co/ggml-org/embeddinggemma-2-GGUF/resolve/main/"
+EMB_FILE = "embeddinggemma-2-Q8_0.gguf"                      # EmbeddingGemma 2 (Google), 4 bit would be 176 MB, this one 310 MB
+EMB_QUERY = "task: search result | query: "                  # the model wants a short label before a question ...
+EMB_DOCUMENT = "title: none | text: "                        # ... and another before a note; without them the search is worse
+EMB_LOG = os.path.join(JETSON_HOME, "embedding-server.log")
+
+
+def emb_ready():
+    """True when the embedding server answers."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(EMB_URL + "/health", timeout=2) as answer:
+            return answer.status == 200
+    except Exception:
+        return False
+
+
+def emb_start(wait=90):
+    """Start the embedding server (EmbeddingGemma 2, about 0.25 GB of memory). It is shared by all students of the Jetson.
+    embed() starts it by itself when it is not running, so you rarely need to call this."""
+    if emb_ready():
+        return
+    os.makedirs(LLM_DIR, exist_ok=True)
+    path = os.path.join(LLM_DIR, EMB_FILE)
+    if not os.path.exists(path) or os.path.exists(path + ".part"):
+        print(f"{EMB_FILE}: downloading (about 310 MB, a few minutes, only the first time)...")
+        if subprocess.run(["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", EMB_HF + EMB_FILE]).returncode != 0:
+            raise SystemExit(f"Download of {EMB_FILE} failed. Check the network and run this cell again (it continues where it stopped).")
+        os.replace(path + ".part", path)
+    if not os.path.exists(LLM_SERVER):
+        raise SystemExit("llama-server is not built on this Jetson (ask the teacher to run labs-setup.sh).")
+    command = [LLM_SERVER, "-m", path, "--embeddings", "-ngl", "99", "-c", "2048", "-lm", "none", "--host", "127.0.0.1", "--port", str(EMB_PORT)]
+    subprocess.Popen(command, stdout=open(EMB_LOG, "w"), stderr=subprocess.STDOUT, start_new_session=True)
+    started = time.time()
+    while time.time() - started < wait:
+        if emb_ready():
+            print(f"Embedding server ready after {time.time() - started:.0f} s.")
+            return
+        time.sleep(1)
+    raise SystemExit("The embedding server did not start in time. Look at the end of " + EMB_LOG + " (!tail -20 ~/embedding-server.log)")
+
+
+def embed(texts, kind="document"):
+    """Turn texts into vectors of 768 numbers (each of length 1). kind="document" for notes, kind="query" for a question.
+    Returns a numpy array with one row for each text. Starts the embedding server if it is not running."""
+    import json
+    import urllib.request
+    import numpy as np
+    if not emb_ready():
+        emb_start()
+    prefix = EMB_QUERY if kind == "query" else EMB_DOCUMENT
+    body = json.dumps({"input": [prefix + t for t in texts]}).encode()
+    request = urllib.request.Request(EMB_URL + "/v1/embeddings", body, {"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=60) as answer:
+        vectors = np.array([d["embedding"] for d in json.load(answer)["data"]], dtype=float)
+    return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
 
 
 def llm_chat(messages, images=None, options=None, on_token=None):
