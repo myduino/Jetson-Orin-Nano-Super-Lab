@@ -1,4 +1,4 @@
-# Settings of your ESP32-S3 board. Fill in your own values. The notebook of Lab 27 writes the MQTT lines for you.
+# Settings of your ESP32-S3 board. Fill in your own values. The notebook of Lab 28 writes the MQTT lines for you.
 
 WIFI_SSID = "your-wifi-name"          # the Wi-Fi of the lab (2.4 GHz only, the ESP32 cannot use 5 GHz)
 WIFI_PASSWORD = "your-wifi-password"

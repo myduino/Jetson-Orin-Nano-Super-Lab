@@ -3,16 +3,16 @@
 **Course:** Jetson Orin Nano Super — Applied AI and AIoT  
 **Version:** Revised 8 November 2026  
 **Learning approach:** Hands-on first → easy to implement → progressive complexity → real-world integration.  
-**Structure:** **4 parts · 41 labs (Lab 0–40) · 7 project milestones**.
+**Structure:** **4 parts · 42 labs (Lab 0–41) · 7 project milestones**.
 
 > **Curriculum principle:** Lab order is based on **practical implementation difficulty**, required prerequisites, integration complexity, and troubleshooting effort—not a universal ranking of the theoretical difficulty of AI disciplines. Each lab should produce a working, demonstrable result. Quality matters more than a fixed lab count.
 
 | Part | Name | Action | Labs | End-of-part outcome |
 |---|---|---|---|---|
 | 1 | Foundations | Get Ready | 0–5 | Jetson System Monitor |
-| 2 | Applied AI | Use AI | 6–30 | Intelligent AIoT System |
-| 3 | AI Model Customization | Adapt AI | 31–34 | Custom AI Model Challenge |
-| 4 | Machine Learning & Deep Learning Fundamentals | Train AI | 35–40 | Train and Evaluate Your Own AI Model |
+| 2 | Applied AI | Use AI | 6–31 | Intelligent AIoT System |
+| 3 | AI Model Customization | Adapt AI | 32–35 | Custom AI Model Challenge |
+| 4 | Machine Learning & Deep Learning Fundamentals | Train AI | 36–41 | Train and Evaluate Your Own AI Model |
 
 ## Part 1: Foundations (Get Ready)
 
@@ -78,13 +78,14 @@
 |---|---|---|
 | 20 | Large Language Models (LLMs) and Prompt Engineering | Run or access an LLM; practise system/user instructions, context, few-shot examples, structured JSON output, and simple output checks. |
 | 21 | Vision-Language Models (VLMs) | Ask natural-language questions about an image using a compatible VLM. |
-| 22 | Multimodal AI: Text, Vision and Speech | Combine text, images/camera input, speech-to-text, and text-to-speech in a basic multimodal interaction. |
-| 23 | Text Embeddings and Retrieval-Augmented Generation (RAG) | Embed short documents, retrieve relevant passages, and generate grounded answers with source references. |
-| 24 | LLM Tool Calling and API Integration | Let an LLM request a defined Python tool; validate arguments, call a local/simulated HTTP API, and return tool results to the model. |
-| 25 | Model Context Protocol (MCP) | Build a Python MCP **server** exposing tools; connect an MCP **client**, discover and invoke tools, and compare MCP with direct integration. |
-| 26 | AI Agents and Workflow Automation | Build a bounded multistep agent; use direct or MCP tools, maintain workflow state, handle failures, and request approval for consequential actions. |
+| 22 | Audio Language Models: Speech In, Speech Out | Run an audio language model (LFM3-Audio) on the Jetson: turn speech into text, speak text aloud, and compare it with the dedicated speech models of Labs 17 and 18. |
+| 23 | Multimodal AI: Text, Vision and Speech | Combine text, images/camera input, speech-to-text, and text-to-speech in a basic multimodal interaction. |
+| 24 | Text Embeddings and Retrieval-Augmented Generation (RAG) | Embed short documents, retrieve relevant passages, and generate grounded answers with source references. |
+| 25 | LLM Tool Calling and API Integration | Let an LLM request a defined Python tool; validate arguments, call a local/simulated HTTP API, and return tool results to the model. |
+| 26 | Model Context Protocol (MCP) | Build a Python MCP **server** exposing tools; connect an MCP **client**, discover and invoke tools, and compare MCP with direct integration. |
+| 27 | AI Agents and Workflow Automation | Build a bounded multistep agent; use direct or MCP tools, maintain workflow state, handle failures, and request approval for consequential actions. |
 
-**Project milestone 4 — Language AI (Lab 26):** Build an **AI Agent with Direct Tools and MCP Integration**. Reuse the same simulated sensor tools from Labs 24–25; demonstrate at least one workflow without MCP and one with MCP.
+**Project milestone 4 — Language AI (Lab 27):** Build an **AI Agent with Direct Tools and MCP Integration**. Reuse the same simulated sensor tools from Labs 25–26; demonstrate at least one workflow without MCP and one with MCP.
 
 > **Important distinctions:** API integration exchanges data with an external service. LLM tool calling requests a function but application code executes it. MCP standardizes how hosts/clients discover and access tools, resources, and prompts exposed by servers. An agent orchestrates steps toward a goal and **does not require MCP**. A basic multimodal lab does not require an agent.
 
@@ -92,12 +93,12 @@
 
 | Lab | Name | Hands-on outcome |
 |---|---|---|
-| 27 | AIoT Integration: Jetson as the Brain, ESP32-S3 as the Controller | Exchange real sensor data and commands over a documented transport such as HTTP or MQTT. |
-| 28 | Smart Door: AI Vision and IoT Access Control | Connect a vision event to a simulated/low-voltage door-control demonstrator with manual override and safe default state. |
-| 29 | Sensor Data Streaming, Anomaly Detection and Real-Time Dashboard | Display live data and implement threshold-based or pretrained anomaly detection; distinguish simple rules from learned anomaly models. |
-| 30 | AIoT Capstone: Build Your Own Intelligent System | Build and test a complete Jetson + ESP32-S3 application using relevant AI modalities and a documented workflow. |
+| 28 | AIoT Integration: Jetson as the Brain, ESP32-S3 as the Controller | Exchange real sensor data and commands over a documented transport such as HTTP or MQTT. |
+| 29 | Smart Door: AI Vision and IoT Access Control | Connect a vision event to a simulated/low-voltage door-control demonstrator with manual override and safe default state. |
+| 30 | Sensor Data Streaming, Anomaly Detection and Real-Time Dashboard | Display live data and implement threshold-based or pretrained anomaly detection; distinguish simple rules from learned anomaly models. |
+| 31 | AIoT Capstone: Build Your Own Intelligent System | Build and test a complete Jetson + ESP32-S3 application using relevant AI modalities and a documented workflow. |
 
-**Project milestone 5 — AIoT Integration (Lab 30):** Deliver an **Intelligent AIoT System** with demonstration, clear system diagram, input-to-action flow, and failure/safety checks. Combining several AI domains is encouraged when practical, but not compulsory.
+**Project milestone 5 — AIoT Integration (Lab 31):** Deliver an **Intelligent AIoT System** with demonstration, clear system diagram, input-to-action flow, and failure/safety checks. Combining several AI domains is encouraged when practical, but not compulsory.
 
 ## Part 3: AI Model Customization (Adapt AI)
 
@@ -105,14 +106,14 @@
 
 | Lab | Name | Hands-on outcome |
 |---|---|---|
-| 31 | Model Training Essentials: Datasets, Epochs, Loss and Evaluation | Explore labeling, train/validation/test splits, loss curves, epochs, metrics, and overfitting with a tiny guided example. |
-| 32 | Fine-Tuning Vision AI: Custom YOLO Object Detector | Label a small image dataset, train or fine-tune a compatible detection model, and evaluate results against a baseline. |
-| 33 | Custom Speech AI: Train Your Own Wake-Word Model | Prepare labeled audio clips and train or adapt a compact wake-word/keyword-spotting model. |
-| 34 | Fine-Tuning Language AI: LoRA on a Small LLM | Prepare a small instruction dataset and conduct parameter-efficient adaptation on feasible hardware; compare baseline and adapted outputs. |
+| 32 | Model Training Essentials: Datasets, Epochs, Loss and Evaluation | Explore labeling, train/validation/test splits, loss curves, epochs, metrics, and overfitting with a tiny guided example. |
+| 33 | Fine-Tuning Vision AI: Custom YOLO Object Detector | Label a small image dataset, train or fine-tune a compatible detection model, and evaluate results against a baseline. |
+| 34 | Custom Speech AI: Train Your Own Wake-Word Model | Prepare labeled audio clips and train or adapt a compact wake-word/keyword-spotting model. |
+| 35 | Fine-Tuning Language AI: LoRA on a Small LLM | Prepare a small instruction dataset and conduct parameter-efficient adaptation on feasible hardware; compare baseline and adapted outputs. |
 
-**Project milestone 6 — AI Model Customization (Lab 34 assessment):** Complete **one** specialization track (vision, speech, or language) and present the dataset, method, trained/adapted model, demonstration, and before/after evaluation. Other customization labs can use guided demonstrations or small-scale exercises.
+**Project milestone 6 — AI Model Customization (Lab 35 assessment):** Complete **one** specialization track (vision, speech, or language) and present the dataset, method, trained/adapted model, demonstration, and before/after evaluation. Other customization labs can use guided demonstrations or small-scale exercises.
 
-> **Scope:** Training a wake-word model from scratch is *not* fine-tuning. LoRA does not mean training an LLM from scratch. Large-model training may exceed the Jetson Orin Nano Super's practical memory/compute budget; use small models, careful memory management, or separate GPU resources when necessary. Lab 31 is a practical prerequisite primer, not a replacement for the deeper ML theory in Part 4.
+> **Scope:** Training a wake-word model from scratch is *not* fine-tuning. LoRA does not mean training an LLM from scratch. Large-model training may exceed the Jetson Orin Nano Super's practical memory/compute budget; use small models, careful memory management, or separate GPU resources when necessary. Lab 32 is a practical prerequisite primer, not a replacement for the deeper ML theory in Part 4.
 
 ## Part 4: Machine Learning & Deep Learning Fundamentals (Train AI)
 
@@ -120,14 +121,14 @@
 
 | Lab | Name | Hands-on outcome |
 |---|---|---|
-| 35 | Datasets, Features, Labels and Data Preparation | Clean data, define features/labels, prevent data leakage, and create appropriate splits. |
-| 36 | Classical Machine Learning: Classification and Regression | Train and compare simple supervised learning models with suitable metrics. |
-| 37 | Building a Neural Network from Scratch | Implement a tiny neural network (e.g. in NumPy) to explore forward propagation, loss, gradients, and weight updates. |
-| 38 | Convolutional Neural Networks (CNNs) for Image Classification | Train and test a small image CNN using a suitable framework. |
-| 39 | Model Evaluation, Overfitting and Hyperparameter Tuning | Compare held-out results, investigate overfitting, and change one hyperparameter at a time. |
-| 40 | Machine Learning Capstone: Train and Evaluate Your Own Model | Prepare data, select a baseline, train/evaluate a model, and demonstrate reproducible inference. |
+| 36 | Datasets, Features, Labels and Data Preparation | Clean data, define features/labels, prevent data leakage, and create appropriate splits. |
+| 37 | Classical Machine Learning: Classification and Regression | Train and compare simple supervised learning models with suitable metrics. |
+| 38 | Building a Neural Network from Scratch | Implement a tiny neural network (e.g. in NumPy) to explore forward propagation, loss, gradients, and weight updates. |
+| 39 | Convolutional Neural Networks (CNNs) for Image Classification | Train and test a small image CNN using a suitable framework. |
+| 40 | Model Evaluation, Overfitting and Hyperparameter Tuning | Compare held-out results, investigate overfitting, and change one hyperparameter at a time. |
+| 41 | Machine Learning Capstone: Train and Evaluate Your Own Model | Prepare data, select a baseline, train/evaluate a model, and demonstrate reproducible inference. |
 
-**Project milestone 7 — ML & Deep Learning (Lab 40):** Submit a working model, baseline comparison, evaluation on held-out data, training notes, and an inference demo.
+**Project milestone 7 — ML & Deep Learning (Lab 41):** Submit a working model, baseline comparison, evaluation on held-out data, training notes, and an inference demo.
 
 ## Seven Project Milestones
 
@@ -136,10 +137,10 @@
 | 1 | Foundations | 5 | Jetson System Monitor |
 | 2 | Applied AI / Vision | 16 | Object Counter and Missing-Item Alert |
 | 3 | Applied AI / Speech | 19 | Voice-Controlled Assistant |
-| 4 | Applied AI / Language | 26 | AI Agent with Direct Tools and MCP Integration |
-| 5 | Applied AI / AIoT | 30 | Intelligent AIoT System |
-| 6 | AI Model Customization | 34 | Custom AI Model Challenge |
-| 7 | ML & Deep Learning Fundamentals | 40 | Train and Evaluate Your Own AI Model |
+| 4 | Applied AI / Language | 27 | AI Agent with Direct Tools and MCP Integration |
+| 5 | Applied AI / AIoT | 31 | Intelligent AIoT System |
+| 6 | AI Model Customization | 35 | Custom AI Model Challenge |
+| 7 | ML & Deep Learning Fundamentals | 41 | Train and Evaluate Your Own AI Model |
 
 ## Lab Development Standards
 

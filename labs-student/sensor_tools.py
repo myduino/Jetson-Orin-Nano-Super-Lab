@@ -1,4 +1,4 @@
-"""A small simulated smart building for Labs 24, 25 and 26: sensors you can read and switches you can turn on.
+"""A small simulated smart building for Labs 25, 26 and 27: sensors you can read and switches you can turn on.
 
 Everything is kept in memory, so nothing real can break. The labs give these functions to a language model as TOOLS.
 The functions are plain Python: read them, change them, add your own.
@@ -78,7 +78,7 @@ def open_door(name: str) -> str:
 
 
 FUNCTIONS = {f.__name__: f for f in (list_rooms, get_temperature, get_humidity, set_light, set_fan, open_door)}
-CONSEQUENTIAL = {"set_fan", "open_door"}      # actions that change the real world: a person must approve them in Lab 26
+CONSEQUENTIAL = {"set_fan", "open_door"}      # actions that change the real world: a person must approve them in Lab 27
 
 _TYPES = {str: "string", int: "integer", float: "number", bool: "boolean", list: "array"}
 

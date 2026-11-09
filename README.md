@@ -50,14 +50,14 @@ Outside those two folders there are only two things, because Linux needs them: t
 
 ## Course Flow
 
-The course has four parts and 41 labs (Lab 0 to Lab 40). The full list, with what each lab does, is in [COURSE_MAP.md](COURSE_MAP.md).
+The course has four parts and 42 labs (Lab 0 to Lab 41). The full list, with what each lab does, is in [COURSE_MAP.md](COURSE_MAP.md).
 
 | Part | Name | Labs |
 |---|---|---|
 | 1 | Foundations (Get Ready) | 0 to 5: the demo, the Jetson, Linux, Python, GPU computing |
-| 2 | Applied AI (Use AI) | 6 to 30: Vision AI (6 to 16), Speech AI (17 to 19), Language AI (20 to 26), AIoT (27 to 30) |
-| 3 | AI Model Customization (Adapt AI) | 31 to 34: training basics, fine-tune YOLO, train a wake word, LoRA on a small LLM |
-| 4 | Machine Learning and Deep Learning Fundamentals (Train AI) | 35 to 40: data, classical ML, a neural network from scratch, CNNs, tuning, capstone |
+| 2 | Applied AI (Use AI) | 6 to 31: Vision AI (6 to 16), Speech AI (17 to 19), Language AI (20 to 27), AIoT (28 to 31) |
+| 3 | AI Model Customization (Adapt AI) | 32 to 35: training basics, fine-tune YOLO, train a wake word, LoRA on a small LLM |
+| 4 | Machine Learning and Deep Learning Fundamentals (Train AI) | 36 to 41: data, classical ML, a neural network from scratch, CNNs, tuning, capstone |
 
 ## Folders
 
@@ -88,13 +88,13 @@ If you break something on a Jetson, delete the course folder and clone it again,
 | 0 to 5 | Demo, the Jetson, Linux, Python, GPU computing (with the Jetson System Monitor project) | |
 | 6 to 16 | Vision AI: OpenCV, QR and barcodes, OCR, classification, detection, oriented boxes, segmentation, pose, tracking, TensorRT, a vision project | Camera |
 | 17 to 19 | Speech AI: speech to text, text to speech, wake word and a voice assistant | USB microphone (the webcam microphone works) and a speaker. Lab 19 uses the pretrained openWakeWord models. |
-| 20 to 26 | Language AI: LLMs and prompt engineering, VLMs, multimodal assistant, embeddings and RAG, tool calling, MCP, AI agents | Uses llama.cpp (built by `labs-setup.sh`); one student per Jetson starts the server in Lab 20 and the others use it. Lab 21 adds the eyes (mmproj file) to the same model. Labs 24 to 26 use the simulated building of `labs-student/sensor_tools.py`. |
-| 27 to 30 | AIoT with the ESP32-S3 over MQTT, smart door, sensor streams and dashboard, capstone | The Jetson does the AI, the ESP32 does the IoT. A virtual ESP32 is built in, so the labs run before the board arrives. |
-| 31 to 34 | Model customization: training basics, fine-tune YOLO, train a wake word, LoRA on SmolLM2-135M | Lab 34 downloads a 270 MB model. Training needs about 2 GB of GPU memory: stop the language model server first. |
-| 35 to 40 | Machine learning: data preparation, classical ML, a neural network in NumPy, CNNs, tuning, capstone | scikit-learn datasets, nothing to download |
+| 20 to 27 | Language AI: LLMs and prompt engineering, VLMs, audio language models, multimodal assistant, embeddings and RAG, tool calling, MCP, AI agents | Uses llama.cpp (built by `labs-setup.sh`); one student per Jetson starts the server in Lab 20 and the others use it. Lab 21 adds the eyes (mmproj file) to the same model. Labs 25 to 27 use the simulated building of `labs-student/sensor_tools.py`. |
+| 28 to 31 | AIoT with the ESP32-S3 over MQTT, smart door, sensor streams and dashboard, capstone | The Jetson does the AI, the ESP32 does the IoT. A virtual ESP32 is built in, so the labs run before the board arrives. |
+| 32 to 35 | Model customization: training basics, fine-tune YOLO, train a wake word, LoRA on SmolLM2-135M | Lab 35 downloads a 270 MB model. Training needs about 2 GB of GPU memory: stop the language model server first. |
+| 36 to 41 | Machine learning: data preparation, classical ML, a neural network in NumPy, CNNs, tuning, capstone | scikit-learn datasets, nothing to download |
 
 The program for the ESP32-S3 is in `labs-student/esp32/` (`main.py` and `config.py`). The pins in `config.py` are placeholders: change them to match your wiring.
 
 ## Status
 
-Tested cell by cell on a real Jetson Orin Nano Super (JetPack 6.2): Labs 5, 7 to 11, 16, 19 (with replayed audio), 20 to 26 (with a real language model server), 31 and 34 to 40. The parts that need a camera, a real microphone or a speaker were not tested. Labs 0 to 4, 6, 12 to 15, 17, 18, 27 to 30, 32 and 33 keep the earlier text, renumbered for the new order, and were tested earlier only in part. The teacher page, the agent and the notebook flow were tested with stand-ins and have not run on real hardware yet. The ESP32 labs (27 to 30) were tested only with simulations (a fake MQTT broker and a virtual ESP32).
+Tested cell by cell on a real Jetson Orin Nano Super (JetPack 6.2): Labs 5, 7 to 11, 16, 19 (with replayed audio), 20, 21 and 23 to 27 (with a real language model server), 32 and 35 to 41. The parts that need a camera, a real microphone or a speaker were not tested. Labs 0 to 4, 6, 12 to 15, 17, 18, 28 to 31, 33 and 34 keep the earlier text, renumbered for the new order, and were tested earlier only in part. The teacher page, the agent and the notebook flow were tested with stand-ins and have not run on real hardware yet. The ESP32 labs (27 to 30) were tested only with simulations (a fake MQTT broker and a virtual ESP32).
