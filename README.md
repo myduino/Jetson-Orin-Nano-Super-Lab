@@ -28,7 +28,7 @@ By hand instead, on the Jetson: `git clone https://github.com/myduino/Jetson-Ori
 
 ## Every class
 
-1. Switch on the Jetsons (network cable or Wi-Fi) and plug in the cameras (up to 3 for each Jetson). Double-click **Myduino Jetson Lab** on your PC. The window is the teacher portal.
+1. Switch on the Jetsons (network cable or Wi-Fi) and plug in the cameras (up to 3 for each Jetson). Double-click **Myduino NVIDIA Jetson Orin Nano Lab** on your PC. The window is the teacher portal.
 2. Once, in the **Students** tab: make a class, add the students' names, and for each student choose the **Jetson** and the **camera**.
 3. Each time before the class: open the portal, go to **Students**, open the class tab and click **Start Lab**. The Jetsons start the Jupyter of that class's students, and each Jetson card shows who uses it.
 4. Tell each student their address and PIN: "Amira, awak masuk 192.168.0.234:8881, PIN 482913".
