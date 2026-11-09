@@ -793,15 +793,11 @@ ALM_URL = "http://127.0.0.1:8083"
 ALM_PORT = 8083
 ALM_MODELS = {                                                # the model file (language model) and the ears-and-voice file (mmproj) of each
     "lfm3-audio-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-Audio-2B-GGUF/resolve/main/", "file": "LFM3-Audio-2B-Q4_K_M.gguf",
-                      "ears": "mmproj-LFM3-Audio-2B-Q8_0.gguf", "ctx": "1024", "note": "speech in, speech out (Lab 22), about 1.5 GB",
-                      "voice": [["-ngl", "99", "-c", "512", "-b", "64", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on"],
-                                ["-ngl", "0", "-c", "512", "-b", "64", "-ub", "32", "--no-mmproj-offload"], "CPU"]},
+                      "ears": "mmproj-LFM3-Audio-2B-Q8_0.gguf", "ctx": "1024", "note": "speech in, speech out (Lab 22), about 1.5 GB"},
     "lfm3-omni-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/main/", "file": "LFM3-Omni-2B-Q4_K_M.gguf",
-                     "ears": "mmproj-LFM3-Omni-2B-Q8_0.gguf", "ctx": "3072", "note": "text, pictures and speech in one model (Lab 23), about 2 GB",
-                     "voice": [["-ngl", "0", "-c", "512", "-b", "64", "-ub", "32", "--no-mmproj-offload"], "CPU"]},      # next to the Omni server the GPU memory is tight: the voice uses the GPU only a little, or not at all
+                     "ears": "mmproj-LFM3-Omni-2B-Q8_0.gguf", "ctx": "3072", "note": "text, pictures and speech in one model (Lab 23), about 2 GB"},
 }
 ALM_DEFAULT = "lfm3-audio-2b"
-ALM_TTS = os.path.join(JETSON_HOME, "llama.cpp", "build", "bin", "llama-tts")
 ALM_LOG = os.path.join(JETSON_HOME, "audio-server.log")
 
 
@@ -859,7 +855,7 @@ def alm_start(model=None, wait=120):
         _drop_cache(path)
     command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]), "--mmproj", os.path.join(LLM_DIR, info["ears"]), "-ngl", "99", "-c", info["ctx"],
                "-b", "256", "-ub", "128", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--jinja", "--reasoning", "off", "--host", "127.0.0.1", "--port", str(ALM_PORT)]
-    # a short context and small batches keep the GPU memory low, so that llama-tts (speech out) can run next to this server
+    # a short context and small batches keep the GPU memory low
     subprocess.Popen(command, stdout=open(ALM_LOG, "w"), stderr=subprocess.STDOUT, start_new_session=True)
     started = time.time()
     while time.time() - started < wait:
@@ -924,29 +920,20 @@ def alm_ask(text, system="Answer in one short sentence.", max_tokens=150):
 
 
 def alm_speak(text, path="speech.wav", voice="female", lang="en"):
-    """Turn text into speech with the voice of the audio model and save it as a WAV file (24 000 Hz). voice: "female" or "male".
-    lang: a language code such as en, fr, es, de, ja. Returns the seconds it took (it loads the model each time, so it is slow)."""
-    if not os.path.exists(ALM_TTS):
-        raise SystemExit("llama-tts is not built on this Jetson (ask the teacher to run labs-setup.sh).")
-    info = ALM_MODELS[alm_current() if alm_current() in ALM_MODELS else ALM_DEFAULT]
-    base = [ALM_TTS, "-m", os.path.join(LLM_DIR, info["file"]), "-mm", os.path.join(LLM_DIR, info["ears"])]
-    tail = ["-p", text, "--tts-voice", voice, "--tts-lang", lang, "-o", path]
-    # The GPU memory is tight when the audio server runs too: the voice tries the settings of the model one after the other.
-    settings = info["voice"]
+    """Turn text into speech with the voice of the audio model and save it as a WAV file (24 000 Hz). The audio server makes the sound
+    (it answers POST /tts). voice: "female" or "male". lang: a language code such as en, fr, es, de, ja. Returns the seconds it took."""
+    import json
+    import urllib.request
+    body = json.dumps({"input": text, "voice": voice, "lang": lang}).encode()
+    request = urllib.request.Request(ALM_URL + "/tts", body, {"Content-Type": "application/json"})
     started = time.time()
-    result = None
-    for options in settings:
-        if os.path.exists(path):
-            os.remove(path)                                    # an old file must not look like a success
-        env = dict(os.environ)
-        if options == "CPU":                                   # the last resort: hide the GPU, so the voice uses only the CPU
-            options = settings[-2]
-            env["CUDA_VISIBLE_DEVICES"] = ""
-        result = subprocess.run(base + options + tail, capture_output=True, text=True, env=env)
-        if result.returncode == 0 and os.path.exists(path):
-            break
-    else:
-        raise SystemExit("llama-tts failed. If it says out of memory, close other notebooks and try again. " + (result.stderr or result.stdout)[-300:])
+    try:
+        with urllib.request.urlopen(request, timeout=180) as answer:
+            sound = answer.read()
+    except OSError as problem:
+        raise SystemExit(f"The audio server could not make the speech ({problem}). Is it running? labview.alm_start()  (one student per Jetson).")
+    with open(path, "wb") as f:
+        f.write(sound)
     return time.time() - started
 
 
