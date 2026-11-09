@@ -121,7 +121,46 @@ def make_venv(key, home):
 
 
 # ---------------------------------------------------------------- a student's folder and JupyterLab
+def migrate_lab_numbers(home):
+    """The course got a new Lab 22 (Audio Language Models): the old Labs 22 to 40 are now 23 to 41. A student folder made before that still has the
+    old work in lab22 ... lab40. This moves it up by one, once, so that each lab keeps the work of the student. The marker file says it is done."""
+    marker = os.path.join(home, ".lab_numbering")
+    if os.path.exists(marker):
+        return
+    old_layout = bool(glob.glob(os.path.join(home, "lab22", "lab22_multimodal*")))
+    if old_layout:
+        for n in range(MAX_LABS - 2, 21, -1):                      # from the top, so that nothing is overwritten
+            src, dst = os.path.join(home, f"lab{n}"), os.path.join(home, f"lab{n + 1}")
+            if not os.path.isdir(src):
+                continue
+            if os.path.isdir(dst) and not os.listdir(dst):
+                os.rmdir(dst)
+            if os.path.exists(dst):
+                continue                                           # not empty: leave it, never overwrite the work of a student
+            os.rename(src, dst)
+            for name in os.listdir(dst):
+                if name.startswith(f"lab{n}_"):
+                    os.rename(os.path.join(dst, name), os.path.join(dst, f"lab{n + 1}_" + name[len(f"lab{n}_"):]))
+            os.makedirs(src, exist_ok=True)
+        book = os.path.join(home, ".delivered.json")               # what the student was given: the file names change too
+        try:
+            given = json.load(open(book))
+        except (OSError, ValueError):
+            given = {}
+        moved = {}
+        for key, value in given.items():
+            m = re.match(r"lab(\d+)/lab(\d+)_(.*)$", key)
+            if m and int(m.group(1)) >= 22:
+                key = f"lab{int(m.group(1)) + 1}/lab{int(m.group(2)) + 1}_{m.group(3)}"
+            moved[key] = value
+        with open(book, "w") as f:
+            json.dump(moved, f)
+    with open(marker, "w") as f:
+        f.write("2\n")
+
+
 def prepare(home):
+    migrate_lab_numbers(home)
     for n in range(MAX_LABS):
         os.makedirs(os.path.join(home, f"lab{n}"), exist_ok=True)
     for d in ("models", ".jupyter", ".ipython", ".config", ".tmp"):
