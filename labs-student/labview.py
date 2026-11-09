@@ -504,14 +504,21 @@ LLM_LOG = os.path.expanduser("~/llama-server.log")
 # The models of the labs (Q4_K_M = 4 bit). Each has its main file and its "eyes" file (the mmproj) for pictures.
 # "hf" is the web address of the files, "eyes" the name of the eyes file there, "eyes_here" its name on this Jetson.
 LLM_MODELS = {
+    "lfm3-1.7b": {"hf": "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/", "file": "LFM3-1.7B-Q4_K_M.gguf",
+                  "vision_model": "lfm3-vl-2b",                  # no eyes of its own: llm_start(vision=True) switches to this one
+                  "extra": ["--reasoning", "off"],              # LFM3 thinks first by default, and the short answers stay empty
+                  "note": "the default for text: Liquid AI LFM3, about 27 tokens per second, about 3 GB of memory in use"},
+    "lfm3-vl-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-VL-2B-GGUF/resolve/main/", "file": "LFM3-VL-2B-Q4_K_M.gguf",
+                   "eyes": "mmproj-LFM3-VL-2B-Q8_0.gguf", "eyes_here": "LFM3-VL-2B-mmproj-Q8_0.gguf", "extra": ["--reasoning", "off"],
+                   "note": "the default for pictures: Liquid AI LFM3 vision-language, about 30 tokens per second, about 3.5 GB in use with the eyes"},
     "qwen3.5-2b": {"hf": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/", "file": "Qwen3.5-2B-Q4_K_M.gguf",
                    "eyes": "mmproj-F16.gguf", "eyes_here": "Qwen3.5-2B-mmproj-F16.gguf",
-                   "note": "the default: fast (about 33 tokens per second), about 3.2 GB of memory in use (4.2 GB with the eyes)"},
+                   "note": "fast (about 33 tokens per second), about 3.5 GB of memory in use (4.2 GB with the eyes)"},
     "lfm2.5-vl-1.6b": {"hf": "https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/", "file": "LFM2.5-VL-1.6B-Q4_K_M.gguf",
                        "eyes": "mmproj-LFM2.5-VL-1.6b-Q8_0.gguf", "eyes_here": "LFM2.5-VL-1.6B-mmproj-Q8_0.gguf",
                        "note": "the smallest and fastest (about 59 tokens per second), about 2.4 GB in use (2.7 GB with the eyes), simpler answers"},
 }
-LLM_DEFAULT = "qwen3.5-2b"
+LLM_DEFAULT = "lfm3-1.7b"
 LLM_USE = os.path.join(LLM_DIR, ".llm_use")           # who asked the server last, and when (shared by the students of this Jetson)
 LLM_BUSY_SECONDS = 120                                 # a switch is refused while somebody else used the server in this time
 
@@ -634,8 +641,8 @@ def llm_download(model=LLM_DEFAULT, vision=False, show=print):
 
 def llm_start(model=None, vision=None, wait=90, force=False):
     """Start the language model server (only ONE student per Jetson runs this; the others use the same server).
-    llm_start() starts the default model as TEXT ONLY (about 3.2 GB of memory), or keeps what runs.
-    llm_start(vision=True) loads the model WITH the eyes (pictures, about 1 GB more). llm_start("lfm2.5-vl-1.6b") switches the model.
+    llm_start() starts the default model as TEXT ONLY, or keeps what runs.
+    llm_start(vision=True) loads a model WITH the eyes (pictures): the vision twin of the text model. llm_start("qwen3.5-2b") switches the model.
     A change RESTARTS the server for all students of this Jetson (about 30 seconds), so tell your team first.
     It is refused while a team mate used the server in the last 2 minutes (force=True changes it anyway).
     Only one model fits in the memory at a time. Then it prints the link of the chat page."""
@@ -649,6 +656,11 @@ def llm_start(model=None, vision=None, wait=90, force=False):
         model = LLM_DEFAULT if now is None else now
     if vision is None:
         vision = bool(eyes)
+    if vision and "eyes" not in LLM_MODELS[model]:                         # a text-only model: use its vision twin
+        twin = LLM_MODELS[model].get("vision_model")
+        if twin is None:
+            raise SystemExit(f"{model} has no eyes. Choose a model with eyes: " + ", ".join(m for m, i in LLM_MODELS.items() if "eyes" in i))
+        model = twin
     if now is not None:
         other = _used_by_others()
         if other and not force:
@@ -662,7 +674,7 @@ def llm_start(model=None, vision=None, wait=90, force=False):
     llm_download(model, vision)
     command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]),
                "-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja",   # -lm none: load into the GPU memory directly (the default can run out of memory here)
-               "--host", "0.0.0.0", "--port", str(LLM_PORT)]
+               "--host", "0.0.0.0", "--port", str(LLM_PORT)] + info.get("extra", [])
     if vision:
         command += ["--mmproj", os.path.join(LLM_DIR, info["eyes_here"])]
     log = open(LLM_LOG, "w")
