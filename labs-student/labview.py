@@ -791,9 +791,16 @@ def embed(texts, kind="document"):
 # ---------------------------------------------------------------- audio language model (LFM3-Audio on llama.cpp: speech in, speech out)
 ALM_URL = "http://127.0.0.1:8083"
 ALM_PORT = 8083
-ALM_HF = "https://huggingface.co/LiquidAI/LFM3-Audio-2B-GGUF/resolve/main/"
-ALM_FILE = "LFM3-Audio-2B-Q4_K_M.gguf"                      # the language model (1.1 GB) ...
-ALM_EARS = "mmproj-LFM3-Audio-2B-Q8_0.gguf"                 # ... and its ears and voice (0.3 GB): the audio encoder and the speech decoder
+ALM_MODELS = {                                                # the model file (language model) and the ears-and-voice file (mmproj) of each
+    "lfm3-audio-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-Audio-2B-GGUF/resolve/main/", "file": "LFM3-Audio-2B-Q4_K_M.gguf",
+                      "ears": "mmproj-LFM3-Audio-2B-Q8_0.gguf", "ctx": "1024", "note": "speech in, speech out (Lab 22), about 1.5 GB",
+                      "voice": [["-ngl", "99", "-c", "512", "-b", "64", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on"],
+                                ["-ngl", "0", "-c", "512", "-b", "64", "-ub", "32", "--no-mmproj-offload"], "CPU"]},
+    "lfm3-omni-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/main/", "file": "LFM3-Omni-2B-Q4_K_M.gguf",
+                     "ears": "mmproj-LFM3-Omni-2B-Q8_0.gguf", "ctx": "3072", "note": "text, pictures and speech in one model (Lab 23), about 2 GB",
+                     "voice": [["-ngl", "0", "-c", "512", "-b", "64", "-ub", "32", "--no-mmproj-offload"], "CPU"]},      # next to the Omni server the GPU memory is tight: the voice uses the GPU only a little, or not at all
+}
+ALM_DEFAULT = "lfm3-audio-2b"
 ALM_TTS = os.path.join(JETSON_HOME, "llama.cpp", "build", "bin", "llama-tts")
 ALM_LOG = os.path.join(JETSON_HOME, "audio-server.log")
 
@@ -808,34 +815,56 @@ def alm_ready():
         return False
 
 
-def alm_start(wait=120):
-    """Start the audio language model server (LFM3-Audio, about 1.4 GB of memory). Only one student per Jetson does this.
-    The text model of Lab 20 must be stopped first (labview.llm_stop()): both together do not fit in the memory."""
-    if alm_ready():
-        print("The audio server is already running.")
+def alm_current():
+    """The name of the audio model that the audio server runs now (None when it is not running)."""
+    import json
+    import urllib.request
+    if not alm_ready():
+        return None
+    try:
+        with urllib.request.urlopen(ALM_URL + "/props", timeout=5) as answer:
+            path = os.path.basename(json.load(answer).get("model_path", ""))
+    except Exception:
+        return "(unknown)"
+    return next((name for name, info in ALM_MODELS.items() if info["file"] == path), "(unknown)")
+
+
+def alm_start(model=None, wait=120):
+    """Start the audio language model server. alm_start() starts LFM3-Audio (Lab 22), alm_start("lfm3-omni-2b") starts LFM3-Omni (Lab 23).
+    Only one student per Jetson does this. The text model of Lab 20 must be stopped first (labview.llm_stop()): they do not fit together."""
+    model = model or ALM_DEFAULT
+    if model not in ALM_MODELS:
+        raise SystemExit(f"Unknown model {model!r}. Choose one of: {', '.join(ALM_MODELS)}")
+    now = alm_current()
+    if now == model:
+        print(f"The audio server is already running ({model}).")
         return
-    if llm_ready():
+    if llm_ready() and now is None:
         raise SystemExit("The text model is running and the memory is not enough for both. Tell your team, then run  labview.llm_stop()  "
                          "and start this cell again. Afterwards labview.llm_start() brings the text model back.")
+    if now is not None:
+        print(f"Restarting the audio server as {model} ...")
+        llm_stop()
+    info = ALM_MODELS[model]
     os.makedirs(LLM_DIR, exist_ok=True)
-    for name in (ALM_FILE, ALM_EARS):
+    for name in (info["file"], info["ears"]):
         path = os.path.join(LLM_DIR, name)
         if os.path.exists(path) and not os.path.exists(path + ".part"):
             _drop_cache(path)
             continue
         print(f"{name}: downloading (a few minutes, only the first time)...")
-        if subprocess.run(["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", ALM_HF + name]).returncode != 0:
+        if subprocess.run(["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", info["hf"] + name]).returncode != 0:
             raise SystemExit(f"Download of {name} failed. Check the network and run this cell again (it continues where it stopped).")
         os.replace(path + ".part", path)
         _drop_cache(path)
-    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, ALM_FILE), "--mmproj", os.path.join(LLM_DIR, ALM_EARS), "-ngl", "99", "-c", "1024",
-               "-b", "256", "-ub", "128", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--jinja", "--host", "127.0.0.1", "--port", str(ALM_PORT)]
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]), "--mmproj", os.path.join(LLM_DIR, info["ears"]), "-ngl", "99", "-c", info["ctx"],
+               "-b", "256", "-ub", "128", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--jinja", "--reasoning", "off", "--host", "127.0.0.1", "--port", str(ALM_PORT)]
     # a short context and small batches keep the GPU memory low, so that llama-tts (speech out) can run next to this server
     subprocess.Popen(command, stdout=open(ALM_LOG, "w"), stderr=subprocess.STDOUT, start_new_session=True)
     started = time.time()
     while time.time() - started < wait:
         if alm_ready():
-            print(f"Audio server ready after {time.time() - started:.0f} s.")
+            print(f"Audio server ({model}) ready after {time.time() - started:.0f} s.")
             return
         time.sleep(2)
     raise SystemExit("The audio server did not start in time. Look at the end of " + ALM_LOG + " (!tail -20 ~/audio-server.log)")
@@ -846,10 +875,10 @@ def alm_stop():
     llm_stop()
 
 
-def alm_listen(sound, system="Perform ASR.", question=None, max_tokens=150):
+def alm_listen(sound, system="Perform ASR.", question=None, max_tokens=150, image=None):
     """Give a sound to the audio model. sound is a numpy array (as labview.record returns) or the path of a WAV file.
     With the system prompt "Perform ASR." the answer is what was said. With another system prompt (and question=None) the model
-    answers the spoken question. Returns a dict: text, seconds (time it took), audio_seconds, rtf (seconds / audio_seconds)."""
+    answers the spoken question. image (optional): a JPEG picture as bytes (only the Omni model sees it). Returns a dict: text, seconds (time it took), audio_seconds, rtf (seconds / audio_seconds)."""
     import base64
     import json
     import tempfile
@@ -862,6 +891,8 @@ def alm_listen(sound, system="Perform ASR.", question=None, max_tokens=150):
     if not isinstance(sound, str):
         os.remove(path)
     parts = [{"type": "input_audio", "input_audio": {"data": base64.b64encode(wav).decode(), "format": "wav"}}]
+    if image:                                                   # the picture goes AFTER the sound: the other way round the answer stops early
+        parts = parts + [{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(image).decode()}}]
     if question:
         parts = [{"type": "text", "text": question}] + parts
     body = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": parts}], "temperature": 0, "max_tokens": max_tokens}
@@ -897,17 +928,21 @@ def alm_speak(text, path="speech.wav", voice="female", lang="en"):
     lang: a language code such as en, fr, es, de, ja. Returns the seconds it took (it loads the model each time, so it is slow)."""
     if not os.path.exists(ALM_TTS):
         raise SystemExit("llama-tts is not built on this Jetson (ask the teacher to run labs-setup.sh).")
-    base = [ALM_TTS, "-m", os.path.join(LLM_DIR, ALM_FILE), "-mm", os.path.join(LLM_DIR, ALM_EARS), "-ngl", "99"]
+    info = ALM_MODELS[alm_current() if alm_current() in ALM_MODELS else ALM_DEFAULT]
+    base = [ALM_TTS, "-m", os.path.join(LLM_DIR, info["file"]), "-mm", os.path.join(LLM_DIR, info["ears"])]
     tail = ["-p", text, "--tts-voice", voice, "--tts-lang", lang, "-o", path]
-    # The GPU memory is tight when the audio server runs too: small settings first, then smaller ones that use the CPU for the speech decoder.
-    settings = [["-c", "512", "-b", "64", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on"],
-                ["-c", "256", "-b", "32", "-ub", "32", "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--no-mmproj-offload"]]
+    # The GPU memory is tight when the audio server runs too: the voice tries the settings of the model one after the other.
+    settings = info["voice"]
     started = time.time()
     result = None
     for options in settings:
         if os.path.exists(path):
             os.remove(path)                                    # an old file must not look like a success
-        result = subprocess.run(base + options + tail, capture_output=True, text=True)
+        env = dict(os.environ)
+        if options == "CPU":                                   # the last resort: hide the GPU, so the voice uses only the CPU
+            options = settings[-2]
+            env["CUDA_VISIBLE_DEVICES"] = ""
+        result = subprocess.run(base + options + tail, capture_output=True, text=True, env=env)
         if result.returncode == 0 and os.path.exists(path):
             break
     else:
