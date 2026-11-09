@@ -498,9 +498,12 @@ def play(sound, rate=16000, browser=True, speaker=True):
 # ---------------------------------------------------------------- language models (llama.cpp runs on this Jetson)
 LLM_URL = os.environ.get("LLM_URL", "http://127.0.0.1:8080")
 LLM_PORT = 8080
-LLM_DIR = os.path.expanduser("~/models")
-LLM_SERVER = os.path.expanduser("~/llama.cpp/build/bin/llama-server")
-LLM_LOG = os.path.expanduser("~/llama-server.log")
+# In a student notebook HOME is the student's own folder, but llama.cpp and the model files belong to the whole Jetson: they are in the
+# home of the Jetson user, which is the folder above LAB_ROOT.
+JETSON_HOME = os.path.dirname(os.environ["LAB_ROOT"]) if os.environ.get("LAB_ROOT") else os.path.expanduser("~")
+LLM_DIR = os.path.join(JETSON_HOME, "models")
+LLM_SERVER = os.path.join(JETSON_HOME, "llama.cpp", "build", "bin", "llama-server")
+LLM_LOG = os.path.join(JETSON_HOME, "llama-server.log")
 # The models of the labs (Q4_K_M = 4 bit). Each has its main file and its "eyes" file (the mmproj) for pictures.
 # "hf" is the web address of the files, "eyes" the name of the eyes file there, "eyes_here" its name on this Jetson.
 LLM_MODELS = {
