@@ -507,10 +507,18 @@ LLM_LOG = os.path.join(JETSON_HOME, "llama-server.log")
 # The models of the labs (Q4_K_M = 4 bit). Each has its main file and its "eyes" file (the mmproj) for pictures.
 # "hf" is the web address of the files, "eyes" the name of the eyes file there, "eyes_here" its name on this Jetson.
 LLM_MODELS = {
+    "gemma4-e2b": {"hf": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/", "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+                   "vision_model": "lfm3-vl-2b",                 # its own eyes work, but one picture takes about 20 s here: pictures go to LFM3-VL
+                   # Gemma 4 has a very large table of word numbers: it stays in the normal memory (the CPU part), the rest runs on the GPU.
+                   # Small batches and an 8 bit cache keep the GPU memory below the limit of this board.
+                   "args": ["-ngl", "99", "-ot", r"per_layer_token_embd\.weight=CPU", "-c", "4096", "-b", "256", "-ub", "128",
+                            "-ctk", "q8_0", "-ctv", "q8_0", "-fa", "on", "--jinja"],
+                   "extra": ["--reasoning", "off"],
+                   "note": "the default for text: Google Gemma 4 E2B, clean answers in English and Malay, about 25 tokens per second, about 5 GB of memory in use"},
     "lfm3-1.7b": {"hf": "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/", "file": "LFM3-1.7B-Q4_K_M.gguf",
                   "vision_model": "lfm3-vl-2b",                  # no eyes of its own: llm_start(vision=True) switches to this one
                   "extra": ["--reasoning", "off"],              # LFM3 thinks first by default, and the short answers stay empty
-                  "note": "the default for text: Liquid AI LFM3, about 27 tokens per second, about 3 GB of memory in use"},
+                  "note": "Liquid AI LFM3 (text), about 27 tokens per second, about 3 GB of memory in use; weaker at strict answer formats"},
     "lfm3-vl-2b": {"hf": "https://huggingface.co/LiquidAI/LFM3-VL-2B-GGUF/resolve/main/", "file": "LFM3-VL-2B-Q4_K_M.gguf",
                    "eyes": "mmproj-LFM3-VL-2B-Q8_0.gguf", "eyes_here": "LFM3-VL-2B-mmproj-Q8_0.gguf", "extra": ["--reasoning", "off"],
                    "note": "the default for pictures: Liquid AI LFM3 vision-language, about 30 tokens per second, about 3.5 GB in use with the eyes"},
@@ -521,7 +529,7 @@ LLM_MODELS = {
                        "eyes": "mmproj-LFM2.5-VL-1.6b-Q8_0.gguf", "eyes_here": "LFM2.5-VL-1.6B-mmproj-Q8_0.gguf",
                        "note": "the smallest and fastest (about 59 tokens per second), about 2.4 GB in use (2.7 GB with the eyes), simpler answers"},
 }
-LLM_DEFAULT = "lfm3-1.7b"
+LLM_DEFAULT = "gemma4-e2b"
 LLM_USE = os.path.join(LLM_DIR, ".llm_use")           # who asked the server last, and when (shared by the students of this Jetson)
 LLM_BUSY_SECONDS = 120                                 # a switch is refused while somebody else used the server in this time
 
@@ -623,6 +631,19 @@ def llm_vision():
     return bool(_props().get("modalities", {}).get("vision"))
 
 
+def _drop_cache(path):
+    """Tell Linux that a big model file need not stay in the file cache. On this board the cache and the GPU share the memory, and a model
+    that was just copied or downloaded can leave too little for the GPU (the server then stops with 'cudaMalloc failed: out of memory')."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
 def llm_download(model=LLM_DEFAULT, vision=False, show=print):
     """Download the files of a model (only one student per Jetson needs to; a file that is already here is skipped).
     The eyes file is downloaded only with vision=True."""
@@ -633,12 +654,14 @@ def llm_download(model=LLM_DEFAULT, vision=False, show=print):
         path = os.path.join(LLM_DIR, name)
         if os.path.exists(path) and not os.path.exists(path + ".part"):
             show(f"{name}: already here")
+            _drop_cache(path)
             continue
         show(f"{name}: downloading (a few minutes)...")
         command = ["curl", "-fL", "-C", "-", "-o", path + ".part", "-s", info["hf"] + remote]
         if subprocess.run(command).returncode != 0:
             raise SystemExit(f"Download of {name} failed. Check the network and run this cell again (it continues where it stopped).")
         os.replace(path + ".part", path)
+        _drop_cache(path)
         show(f"{name}: done")
 
 
@@ -675,9 +698,8 @@ def llm_start(model=None, vision=None, wait=90, force=False):
     if not os.path.exists(LLM_SERVER):
         raise SystemExit("llama-server is not built on this Jetson (ask the teacher to run labs-setup.sh).")
     llm_download(model, vision)
-    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"]),
-               "-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja",   # -lm none: load into the GPU memory directly (the default can run out of memory here)
-               "--host", "0.0.0.0", "--port", str(LLM_PORT)] + info.get("extra", [])
+    flags = info.get("args") or ["-ngl", "99", "-c", "4096", "-fa", "on", "-lm", "none", "--jinja"]   # -lm none: load into the GPU memory directly (the default can run out of memory here)
+    command = [LLM_SERVER, "-m", os.path.join(LLM_DIR, info["file"])] + flags + ["--host", "0.0.0.0", "--port", str(LLM_PORT)] + info.get("extra", [])
     if vision:
         command += ["--mmproj", os.path.join(LLM_DIR, info["eyes_here"])]
     log = open(LLM_LOG, "w")
