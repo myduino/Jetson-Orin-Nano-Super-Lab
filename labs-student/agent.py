@@ -524,6 +524,14 @@ def course_version():
         return ""
 
 
+def desktop_on():
+    """True when the screen desktop (GDM) of this Jetson runs. The teacher can turn it off to free about 1 GB of memory."""
+    try:
+        return subprocess.run(["systemctl", "is-active", "--quiet", "gdm"], timeout=3).returncode == 0
+    except Exception:
+        return None
+
+
 _cpu_last = [None]
 
 
@@ -570,7 +578,7 @@ def hello(cfg):
     body = {
         "id": cfg.get("id") or re.sub(r"[^a-z0-9_]", "_", socket.gethostname().lower()), "ip": MQTT_HOST[0], "cameras": cameras(),
         "running": [{"key": k, "port": r["port"], "alive": r["proc"].poll() is None} for k, r in running.items()],
-        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True, "course": course_version(), "stats": stats(),
+        "progress": progress_last, "live": live_report(), "deleted": list(deleted), "renamed": list(renamed), "preparing": list(preparing), "ready": True, "course": course_version(), "stats": stats(), "desktop": desktop_on(),
         "note": next(iter(m for _, m in failed.values()), "") or ("MQTT is not installed on this Jetson. Click Update on the Jetsons page." if running and not mqtt_ready() else "") or next(iter(f"Could not rename a class folder: {m}" for m in rename_failed.values()), ""),
     }
     req = urllib.request.Request(f"http://{cfg['teacher']}/agent/hello", data=json.dumps(body).encode(),
