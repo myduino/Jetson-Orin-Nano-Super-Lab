@@ -22,7 +22,7 @@
 
 | Lab | Name | Hands-on outcome |
 |---|---|---|
-| 0 | See It First: AI Vision Demo | Run or observe an instructor-provided AI vision demo; identify its input, inference, and output. |
+| 0 | Experience AI Vision | Run or observe an instructor-provided AI vision demo; identify its input, inference, and output. |
 | 1 | Getting Started with NVIDIA Jetson Orin Nano Super | Identify ports and components, check JetPack and system health, and verify the development environment. |
 | 2 | Ubuntu Linux Essentials (Part 1) | Navigate directories, manage files, and use basic terminal commands. |
 | 3 | Ubuntu Linux Essentials (Part 2) | Manage packages, processes, permissions, networking, and connected devices. |
