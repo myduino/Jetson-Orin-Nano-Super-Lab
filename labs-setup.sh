@@ -49,7 +49,7 @@ else
 fi
 
 echo "== 4. Power mode =="
-command -v nvpmodel > /dev/null && sudo nvpmodel -m 2 && echo "Power mode: MAXN SUPER"
+command -v nvpmodel > /dev/null && echo no | sudo nvpmodel -m 2 && echo "Power mode: MAXN SUPER (full speed after the next reboot)"
 
 echo "== 5. The lab agent =="
 printf '{"teacher": "%s", "key": "%s", "id": "%s"}\n' "$TEACHER" "$KEY" "$NAME" > ~/myduino-jetson-lab/.agent.json
